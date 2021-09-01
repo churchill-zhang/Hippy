@@ -22,9 +22,9 @@
 
 #include "ios_loader_utils.h"
 
-NSURL *IOSLoaderUtil::CreateURLFromUnicodeString(const tdf::base::unicode_string_view &unicodeString) {
-    tdf::base::unicode_string_view utf8String = hippy::base::StringViewUtils::Convert(unicodeString, tdf::base::unicode_string_view::Encoding::Utf8);
-    tdf::base::unicode_string_view::u8string string = utf8String.utf8_value();
+NSURL *IOSLoaderUtil::CreateURLFromUnicodeString(const unicode_string_view &unicodeString) {
+    unicode_string_view utf8String = hippy::base::StringViewUtils::Convert(unicodeString, unicode_string_view::Encoding::Utf8);
+    unicode_string_view::u8string string = utf8String.utf8_value();
     size_t length = string.length();
     if (length) {
         const unsigned char *c_str = string.c_str();
@@ -34,27 +34,27 @@ NSURL *IOSLoaderUtil::CreateURLFromUnicodeString(const tdf::base::unicode_string
     return nil;
 }
 
-tdf::base::unicode_string_view IOSLoaderUtil::ConvertCStringToUnicode16String(const char *c_str) {
-    tdf::base::unicode_string_view stringView = hippy::base::StringViewUtils::ConstCharPointerToStrView(c_str);
-    tdf::base::unicode_string_view u16StringView = hippy::base::StringViewUtils::Convert(stringView, tdf::base::unicode_string_view::Encoding::Utf16);
+IOSLoaderUtil::unicode_string_view IOSLoaderUtil::ConvertCStringToUnicode16String(const char *c_str) {
+    unicode_string_view stringView = hippy::base::StringViewUtils::ConstCharPointerToStrView(c_str);
+    unicode_string_view u16StringView = hippy::base::StringViewUtils::Convert(stringView, tdf::base::unicode_string_view::Encoding::Utf16);
     return u16StringView;
 }
 
-hippy::base::UriLoader::RetCode IOSLoaderUtil::ConvertURIErrorToCode(NSError *error) {
-    hippy::base::UriLoader::RetCode retCode = hippy::base::UriLoader::RetCode::Failed;
+IOSLoaderUtil::RetCode IOSLoaderUtil::ConvertURIErrorToCode(NSError *error) {
+    RetCode retCode = RetCode::Failed;
     if (error) {
         NSInteger code = [error code];
         switch (code) {
             case kCFURLErrorBadURL:
             case kCFURLErrorUnsupportedURL:
-                retCode = hippy::base::UriLoader::RetCode::UriError;
+                retCode = RetCode::UriError;
                 break;
             case kCFURLErrorResourceUnavailable:
             case kCFURLErrorZeroByteResource:
-                retCode = hippy::base::UriLoader::RetCode::ResourceNotFound;
+                retCode = RetCode::ResourceNotFound;
                 break;
             case kCFURLErrorTimedOut:
-                retCode = hippy::base::UriLoader::RetCode::Timeout;
+                retCode = RetCode::Timeout;
                 break;
             default:
                 break;
@@ -63,14 +63,14 @@ hippy::base::UriLoader::RetCode IOSLoaderUtil::ConvertURIErrorToCode(NSError *er
     return retCode;
 }
 
-hippy::base::UriLoader::RetCode IOSLoaderUtil::ConvertFileErrorToCode(NSError *error) {
-    hippy::base::UriLoader::RetCode retCode = hippy::base::UriLoader::RetCode::Failed;
+IOSLoaderUtil::RetCode IOSLoaderUtil::ConvertFileErrorToCode(NSError *error) {
+    RetCode retCode = RetCode::Failed;
     if (error) {
         NSInteger code = [error code];
         switch (code) {
             case NSFileNoSuchFileError:
             case NSFileReadNoSuchFileError:
-                retCode = hippy::base::UriLoader::RetCode::ResourceNotFound;
+                retCode = RetCode::ResourceNotFound;
                 break;
             default:
                 break;

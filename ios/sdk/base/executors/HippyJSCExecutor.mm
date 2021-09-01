@@ -80,7 +80,7 @@ struct RandomAccessBundleData {
     RandomAccessBundleData()
         : bundle(nullptr, fclose) { }
 };
-
+using u8string = tdf::base::unicode_string_view::u8string;
 static bool defaultDynamicLoadAction(const unicode_string_view& uri, std::function<void(u8string)> cb) {
   std::u16string u16Uri = StringViewUtils::Convert(uri, unicode_string_view::Encoding::Utf16).utf16_value();
   HippyLogInfo(@"[Hippy_OC_Log][Dynamic_Load], to default dynamic load action:%S", (const unichar*)u16Uri.c_str());

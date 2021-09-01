@@ -27,24 +27,26 @@
 
 class IOSLoaderUtil {
 public:
+    using unicode_string_view = tdf::base::unicode_string_view;
+    using RetCode = hippy::base::UriLoader::RetCode;
+    
     /**
      * convert unicode_string_view string object to NSURL object
      */
-    static NSURL *CreateURLFromUnicodeString(const tdf::base::unicode_string_view &string);
+    static NSURL *CreateURLFromUnicodeString(const unicode_string_view &string);
     
     /**
      * convert c string to unicode_string_view string
      */
-    static tdf::base::unicode_string_view ConvertCStringToUnicode16String(const char *c_str);
+    static unicode_string_view ConvertCStringToUnicode16String(const char *c_str);
     
     /**
      * convert HTTP URL request error to RetCode
      */
-    static hippy::base::UriLoader::RetCode ConvertURIErrorToCode(NSError *error);
+    static RetCode ConvertURIErrorToCode(NSError *error);
     
     /**
      * convert File URL request error to RetCode
      */
-    static hippy::base::UriLoader::RetCode ConvertFileErrorToCode(NSError *error);
+    static RetCode ConvertFileErrorToCode(NSError *error);
 };
-

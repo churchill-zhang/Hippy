@@ -26,7 +26,7 @@
 
 #pragma mark HTTPLoader
 void HTTPLoader::RequestUntrustedContent(SyncContext& ctx,
-                             std::function<std::shared_ptr<Delegate>()> next) {
+                             std::function<void(SyncContext&)> next) {
     NSURL *url = IOSLoaderUtil::CreateURLFromUnicodeString(ctx.uri);
     if (!url) {
         ctx.ret_code = RetCode::UriError;
@@ -51,7 +51,7 @@ void HTTPLoader::RequestUntrustedContent(SyncContext& ctx,
 }
 
 void HTTPLoader::RequestUntrustedContent(ASyncContext& ctx,
-                                     std::function<std::shared_ptr<Delegate>()> next) {
+                                     std::function<void(ASyncContext&)> next) {
     NSURL *url = IOSLoaderUtil::CreateURLFromUnicodeString(ctx.uri);
     if (!url) {
         ctx.cb(RetCode::UriError, nullptr);
@@ -75,14 +75,14 @@ void HTTPLoader::RequestUntrustedContent(ASyncContext& ctx,
 #pragma mark FileLoader
 
 void FileLoader::RequestUntrustedContent(SyncContext& ctx,
-                             std::function<std::shared_ptr<Delegate>()> next) {
+                             std::function<void(SyncContext&)> next) {
     std::string content;
     ctx.ret_code = getFileData(ctx.uri, content);
     ctx.content = content;
 }
 
 void FileLoader::RequestUntrustedContent(ASyncContext& ctx,
-                                     std::function<std::shared_ptr<Delegate>()> next) {
+                                     std::function<void(ASyncContext&)> next) {
     std::string content;
     RetCode code = getFileData(ctx.uri, content);
     if (ctx.cb) {
@@ -112,14 +112,14 @@ RetCode FileLoader::getFileData(const unicode_string_view &path, std::string &co
 #pragma mark DataLoader
 
 void DataLoader::RequestUntrustedContent(SyncContext& ctx,
-                             std::function<std::shared_ptr<Delegate>()> next) {
+                             std::function<void(SyncContext&)> next) {
     std::string content;
     ctx.ret_code = getContentData(ctx.uri, content);
     ctx.content = content;
 }
 
 void DataLoader::RequestUntrustedContent(ASyncContext& ctx,
-                                     std::function<std::shared_ptr<Delegate>()> next) {
+                                     std::function<void(ASyncContext&)> next) {
     std::string content;
     RetCode code = getContentData(ctx.uri, content);
     if (ctx.cb) {

@@ -41,10 +41,10 @@ public:
     virtual ~HTTPLoader() = default;
     virtual void RequestUntrustedContent(
         SyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next);
+        std::function<void(SyncContext&)> next);
     virtual void RequestUntrustedContent(
         ASyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next);
+        std::function<void(ASyncContext&)> next);
 };
 
 /**
@@ -56,10 +56,10 @@ public:
     virtual ~FileLoader() = default;
     virtual void RequestUntrustedContent(
         SyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next);
+        std::function<void(SyncContext&)> next);
     virtual void RequestUntrustedContent(
         ASyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next);
+        std::function<void(ASyncContext&)> next);
 private:
     /** get file data from path in pararm unicode_string_view
      * @param path file path
@@ -80,10 +80,10 @@ public:
     virtual ~DataLoader() = default;
     virtual void RequestUntrustedContent(
         SyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next);
+        std::function<void(SyncContext&)> next);
     virtual void RequestUntrustedContent(
         ASyncContext& ctx,
-        std::function<std::shared_ptr<Delegate>()> next);
+        std::function<void(ASyncContext&)> next);
 private:
     /** get data from url in pararm unicode_string_view
      * @param path file path
