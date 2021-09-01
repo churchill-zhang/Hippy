@@ -24,27 +24,20 @@
 
 #include "core/core.h"
 
-namespace  {
 using unicode_string_view = tdf::base::unicode_string_view;
 using u8string = unicode_string_view::u8string;
-}
+using u16string = unicode_string_view::u16string;
 
 typedef bool (*RequestUntrustedContentPtr)(const unicode_string_view& uri, std::function<void(u8string)> cb, CFTypeRef userData);
 
 class IOSLoader : public hippy::base::UriLoader {
- public:
-  IOSLoader(RequestUntrustedContentPtr loader, CFTypeRef userData);
+public:
+    IOSLoader() = delete;
+    IOSLoader(RequestUntrustedContentPtr loader, CFTypeRef userData);
+    virtual ~IOSLoader();
 
-  virtual ~IOSLoader();
-
-  virtual bool RequestUntrustedContent(const unicode_string_view& uri, std::function<void(u8string)> cb);
-
-  virtual bool RequestUntrustedContent(const unicode_string_view& uri, u8string& content) {
-    TDF_BASE_NOTIMPLEMENTED();
-    return "";
-  };
-
- private:
-  RequestUntrustedContentPtr loader_;
-  CFTypeRef userData_;
+    virtual unicode_string_view GetScheme(const unicode_string_view& uri);
+private:
+    RequestUntrustedContentPtr loader_;
+    CFTypeRef userData_;
 };

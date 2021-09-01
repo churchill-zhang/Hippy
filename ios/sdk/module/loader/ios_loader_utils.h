@@ -20,18 +20,31 @@
  *
  */
 
-
-#include "ios_loader.h"
+#pragma once
 
 #include "core/core.h"
+#import <Foundation/Foundation.h>
 
-IOSLoader::IOSLoader(RequestUntrustedContentPtr loader, CFTypeRef userData): loader_(loader), userData_(CFRetain(userData)) {}
+class IOSLoaderUtil {
+public:
+    /**
+     * convert unicode_string_view string object to NSURL object
+     */
+    static NSURL *CreateURLFromUnicodeString(const tdf::base::unicode_string_view &string);
+    
+    /**
+     * convert c string to unicode_string_view string
+     */
+    static tdf::base::unicode_string_view ConvertCStringToUnicode16String(const char *c_str);
+    
+    /**
+     * convert HTTP URL request error to RetCode
+     */
+    static hippy::base::UriLoader::RetCode ConvertURIErrorToCode(NSError *error);
+    
+    /**
+     * convert File URL request error to RetCode
+     */
+    static hippy::base::UriLoader::RetCode ConvertFileErrorToCode(NSError *error);
+};
 
-IOSLoader::~IOSLoader() {
-  CFRelease(userData_);
-  userData_ = nullptr;
-}
-
-bool IOSLoader::RequestUntrustedContent(const unicode_string_view& uri, std::function<void(u8string)> cb) {
-  return loader_(uri, cb, userData_);
-}
