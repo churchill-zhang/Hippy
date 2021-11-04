@@ -304,11 +304,11 @@ bool LayoutNode::Reset() {
   return engine_node_->reset();
 }
 
-void LayoutNode::allocate() {
+void LayoutNode::Allocate() {
   engine_node_ = new HPNode();
 }
 
-void LayoutNode::deallocate() {
+void LayoutNode::Deallocate() {
   if (engine_node_ == nullptr) return;
   delete engine_node_;
 }

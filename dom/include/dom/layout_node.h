@@ -8,11 +8,11 @@ inline namespace dom {
 
 class LayoutNode : public std::enable_shared_from_this<LayoutNode> {
  public:
-  LayoutNode() { allocate(); }
+  LayoutNode() { Allocate(); }
 
   LayoutNode(HPNodeRef engine_node_) : engine_node_(engine_node_){};
 
-  ~LayoutNode() { deallocate(); };
+  ~LayoutNode() { Deallocate(); };
 
   /**
    * @brief 设置方向
@@ -308,8 +308,8 @@ class LayoutNode : public std::enable_shared_from_this<LayoutNode> {
   bool Reset();
 
  private:
-  void allocate();
-  void deallocate();
+  void Allocate();
+  void Deallocate();
 
   std::shared_ptr<LayoutNode> parent_;
   std::vector<std::shared_ptr<LayoutNode>> children_;
