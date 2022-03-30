@@ -20,17 +20,8 @@
  * limitations under the License.
  */
 
-#import <Foundation/Foundation.h>
-#import "HippyVirtualNode.h"
+#import "HippyWaterfallViewDataSource.h"
 
-@interface HippyBaseListViewDataSource : NSObject
-
-- (void)setDataSource:(NSArray<HippyVirtualCell *> *)dataSource;
-- (HippyVirtualCell *)cellForIndexPath:(NSIndexPath *)indexPath;
-- (HippyVirtualCell *)headerForSection:(NSInteger)section;
-- (NSInteger)numberOfSection;
-- (NSInteger)numberOfCellForSection:(NSInteger)section;
-- (NSIndexPath *)indexPathOfCell:(HippyVirtualCell *)cell;
-- (NSIndexPath *)indexPathForFlatIndex:(NSInteger)index;
+@interface HippyBaseListViewDataSource : HippyWaterfallViewDataSource
 
 @end

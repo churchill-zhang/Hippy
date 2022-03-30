@@ -11,13 +11,13 @@ Hippy 2.2 版本之前只支持加载单个 js bundle 文件。随着业务越�
 
 ## 原理架构
 
-![Communication Info](//m4.publicimg.browser.qq.com/publicimg/nav/hippydoc/dynamic_import.png)
+![Communication Info](../assets/dynamic_import.png)
 
 ## 范例
 
-[[React 范例]](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/src/externals/DyanmicImport/index.jsx)
+[[React 范例]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/src/externals/DyanmicImport/index.jsx)
 
-[[Vue 范例]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-dynamicimport.vue)
+[[Vue 范例]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-dynamicimport.vue)
 
 ## 使用方法
 
@@ -27,7 +27,7 @@ Hippy 2.2 版本之前只支持加载单个 js bundle 文件。随着业务越�
 
 ### 使用
 
-在 [webpack 打包脚本](https://github.com/Tencent/Hippy/tree/master/examples/hippy-vue-demo/scripts) 中引入插件
+在 [webpack 打包脚本](https://github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-vue-demo/scripts) 中引入插件
 
 ```javascript
 const HippyDynamicImportPlugin = require('@hippy/hippy-dynamic-import-plugin');
@@ -94,17 +94,17 @@ plugins: [
  // webpack output 配置
  output: {
     ...
-    publicPath: 'https://static.res.qq.com/hippy/hippyVueDemo/',
+    publicPath: 'https://xxxx/hippy/hippyVueDemo/',
   },
 
 ```
 
-+ 在业务代码引用分包的入口配置 `magic comment`的 `webpackChunkName`（必须） 和 `customChunkPath`（可选），如果没有配置`customChunkPath`，会默认使用全局 `publicPath`；
++ <span id="remote-bundle">在业务代码引用分包的入口配置</span> `magic comment`的 `webpackChunkName`（必须） 和 `customChunkPath`（可选），如果没有配置`customChunkPath`，会默认使用全局 `publicPath`；
 以 Hippy-Vue 为例：
 
 ```javascript
  // Hippy-Vue 配置，
- AsyncComponentFromHttp: () => import(/* customChunkPath: "https://static.res.qq.com/hippy/hippyVueDemo/", webpackChunkName: "asyncComponentFromHttp" */'./dynamicImport/async-component-http.vue')
+ AsyncComponentFromHttp: () => import(/* customChunkPath: "https://xxx/hippy/hippyVueDemo/", webpackChunkName: "asyncComponentFromHttp" */'./dynamicImport/async-component-http.vue')
   .then(res => res)
   .catch(err => console.error('import async remote component error', err))
 ```
@@ -117,7 +117,7 @@ plugins: [
 
 ```javascript
  // Hippy-Vue 配置
- AsyncComponentFromHttp: () => import(/* customChunkPath: "https://static.res.qq.com/hippy/hippyVueDemo/", webpackChunkName: "asyncComponentFromHttp" */'./dynamicImport/async-component-http.vue')
+ AsyncComponentFromHttp: () => import(/* customChunkPath: "https://xxx/hippy/hippyVueDemo/", webpackChunkName: "asyncComponentFromHttp" */'./dynamicImport/async-component-http.vue')
   .then(res => res)
   .catch(err => console.error('import async remote component error', err))
 

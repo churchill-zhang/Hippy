@@ -21,26 +21,33 @@
  */
 
 #import "HippyShadowTextView.h"
-#import "MTTLayout.h"
-#import "x5LayoutUtil.h"
+#import "Hippy.h"
+#import "HippyUtils.h"
+#import "dom/layout_node.h"
+
+
 @interface HippyShadowTextView ()
 @property (nonatomic, strong) NSDictionary *dicAttributes;
 @end
 
-static MTTSize x5MeasureFunc(
-    MTTNodeRef node, float width, MeasureMode widthMeasureMode, __unused float height, __unused MeasureMode heightMeasureMode, void *layoutContext) {
-    HippyShadowTextView *shadowText = (__bridge HippyShadowTextView *)MTTNodeGetContext(node);
-    NSString *text = shadowText.text ?: shadowText.placeholder;
-    if (nil == shadowText.dicAttributes) {
-        if (shadowText.font == nil) {
-            shadowText.font = [UIFont systemFontOfSize:16];
+static hippy::LayoutSize x5MeasureFunc(
+                            HippyShadowTextView *weakShadowText,
+                            float width, hippy::LayoutMeasureMode widthMeasureMode, float height,
+                            hippy::LayoutMeasureMode heightMeasureMode, void *layoutContext) {
+    hippy::LayoutSize result;
+    if (weakShadowText) {
+        HippyShadowTextView *strongShadowText = weakShadowText;
+        NSString *text = strongShadowText.text ?: strongShadowText.placeholder;
+        if (nil == strongShadowText.dicAttributes) {
+            if (strongShadowText.font == nil) {
+                strongShadowText.font = [UIFont systemFontOfSize:16];
+            }
+            strongShadowText.dicAttributes = @ { NSFontAttributeName: strongShadowText.font };
         }
-        shadowText.dicAttributes = @ { NSFontAttributeName: shadowText.font };
+        CGSize computedSize = [text sizeWithAttributes:strongShadowText.dicAttributes];
+        result.width = HippyCeilPixelValue(computedSize.width);
+        result.height = HippyCeilPixelValue(computedSize.height);
     }
-    CGSize computedSize = [text sizeWithAttributes:shadowText.dicAttributes];
-    MTTSize result;
-    result.width = x5CeilPixelValue(computedSize.width);
-    result.height = x5CeilPixelValue(computedSize.height);
     return result;
 }
 
@@ -49,18 +56,29 @@ static MTTSize x5MeasureFunc(
 - (instancetype)init {
     self = [super init];
     if (self) {
-        MTTNodeSetMeasureFunc(self.nodeRef, x5MeasureFunc);
-        MTTNodeSetContext(self.nodeRef, (__bridge void *)self);
     }
     return self;
 }
 
-/*
- * text类型控件会响应用户输入交互，但是并不会更新shadowText中的props属性，
- * 导致前端下发新的props属性与当前属性实际值不一致
- * 因此需要对特定属性进行判断.
- * 这个案例中是text属性
- */
+- (void)setDomManager:(const std::weak_ptr<hippy::DomManager>)domManager {
+    [super setDomManager:domManager];
+    auto shared_domNode = domManager.lock();
+    if (shared_domNode) {
+        int32_t hippyTag = [self.hippyTag intValue];
+        auto node = shared_domNode->GetNode(hippyTag);
+        if (node) {
+            __weak HippyShadowTextView *weakSelf = self;
+            hippy::MeasureFunction measureFunc =
+                [weakSelf](float width, hippy::LayoutMeasureMode widthMeasureMode,
+                                     float height, hippy::LayoutMeasureMode heightMeasureMode, void *layoutContext){
+                return x5MeasureFunc(weakSelf, width, widthMeasureMode,
+                                       height, heightMeasureMode, layoutContext);
+            };
+            node->GetLayoutNode()->SetMeasureFunction(measureFunc);
+        }
+    }
+}
+
 - (NSDictionary *)mergeProps:(NSDictionary *)props {
     NSDictionary *newProps = [super mergeProps:props];
     BOOL oldPropsContainsText = [[props allKeys] containsObject:@"text"];

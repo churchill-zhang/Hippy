@@ -27,9 +27,8 @@
 #import "HippyDefines.h"
 #import "HippyFrameUpdate.h"
 #import "HippyInvalidating.h"
-#import "HippyImageViewCustomLoader.h"
-#import "HippyCustomTouchHandlerProtocol.h"
 #import "HippyImageProviderProtocol.h"
+#import "HippyFrameworkProxy.h"
 
 @class JSValue;
 @class HippyBridge;
@@ -37,7 +36,11 @@
 @class HippyPerformanceLogger;
 @class HippyUIManager;
 @class HippyExtAnimationModule;
-extern NSString *const _HippySDKVersion;
+
+/**
+ * Indicate hippy sdk version
+ */
+HIPPY_EXTERN NSString *const HippySDKVersion;
 /**
  * This notification triggers a reload of all bridges currently running.
  * Deprecated, use HippyBridge::requestReload instead.
@@ -88,7 +91,9 @@ HIPPY_EXTERN NSString *HippyBridgeModuleNameForClass(Class bridgeModuleClass);
 /**
  * Async batched bridge used to communicate with the JavaScript application.
  */
-@interface HippyBridge : NSObject <HippyInvalidating>
+@interface HippyBridge : NSObject <HippyInvalidating, HippyFrameworkProxy>
+
+- (instancetype)initWithmoduleProviderWithoutRuntime:(HippyBridgeModuleProviderBlock)block;
 
 - (instancetype)initWithDelegate:(id<HippyBridgeDelegate>)delegate
                        bundleURL:(NSURL *)bundleURL
@@ -119,6 +124,10 @@ HIPPY_EXTERN NSString *HippyBridgeModuleNameForClass(Class bridgeModuleClass);
 - (void)enqueueJSCall:(NSString *)moduleDotMethod args:(NSArray *)args;
 - (void)enqueueJSCall:(NSString *)module method:(NSString *)method args:(NSArray *)args completion:(dispatch_block_t)completion;
 
+/**
+ * set up chrome dev tools connection
+ */
+- (void)setUpDevClientWithName:(NSString *)name;
 /**
  * This method is used to call functions in the JavaScript application context
  * synchronously.  This is intended for use by applications which do their own
@@ -194,9 +203,7 @@ HIPPY_EXTERN NSString *HippyBridgeModuleNameForClass(Class bridgeModuleClass);
 
 @property (nonatomic, weak, readonly) HippyExtAnimationModule *animationModule;
 
-@property (nonatomic, strong, readonly) id<HippyImageViewCustomLoader> imageLoader;
-@property (nonatomic, strong, readonly) id<HippyCustomTouchHandlerProtocol> customTouchHandler;
-@property (nonatomic, strong, readonly) NSSet<Class<HippyImageProviderProtocol>> *imageProviders;
+@property (nonatomic, weak) id<HippyFrameworkProxy> frameworkProxy;
 
 /**
  * The launch options that were used to initialize the bridge.
@@ -238,21 +245,38 @@ HIPPY_EXTERN NSString *HippyBridgeModuleNameForClass(Class bridgeModuleClass);
 
 @property (nonatomic, assign) BOOL debugMode;
 
-@property (nonatomic, strong) NSMutableDictionary *shareOptions;
+@property (nonatomic, assign) BOOL enableTurbo;
 
 @property (nonatomic, strong) NSString *moduleName;
 
 @property (nonatomic, strong) NSString *appVerson;  //
+
+@property (nonatomic, assign) HippyInvalidateReason invalidateReason;
 
 /**
  * just for debugger
  */
 - (void)bindKeys;
 
+/**
+ * Get  the turbo module for a given name.
+ */
+- (id)turboModuleWithName:(NSString *)name;
+
 @end
 
-@interface UIView(Bridge)
+extern NSString *const HippySecondaryBundleDidStartLoadNotification;
+extern NSString *const HippySecondaryBundleDidLoadSourceCodeNotification;
+extern NSString *const HippySecondaryBundleDidLoadNotification;
 
-@property(nonatomic, weak) HippyBridge *bridge;
+typedef void (^SecondaryBundleLoadingCompletion)(NSError *);
+typedef void (^SecondaryBundleCompletion)(BOOL);
+
+@interface HippyBridge (SecondaryBundleLoader)
+
+- (void)loadSecondary:(NSURL *)secondaryBundleURL
+       loadBundleCompletion:(SecondaryBundleLoadingCompletion)loadBundleCompletion
+    enqueueScriptCompletion:(SecondaryBundleLoadingCompletion)enqueueScriptCompletion
+                 completion:(SecondaryBundleCompletion)completion;
 
 @end

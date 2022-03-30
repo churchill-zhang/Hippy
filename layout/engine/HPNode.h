@@ -24,6 +24,9 @@
 #include "HPLayoutCache.h"
 #include "HPStyle.h"
 #include "HPUtil.h"
+#include "HPConfig.h"
+
+HPConfigRef HPConfigGetDefault();
 
 class HPNode;
 typedef HPNode *HPNodeRef;
@@ -33,26 +36,28 @@ typedef HPSize (*HPMeasureFunc)(HPNodeRef node,
                                 float height,
                                 MeasureMode heightMeasureMode,
                                 void *layoutContext);
+
 typedef void (*HPDirtiedFunc)(HPNodeRef node);
 
 class HPNode {
  public:
-  HPNode();
+  HPNode() : HPNode{HPConfigGetDefault()} {}
+  HPNode(HPConfigRef config);
   virtual ~HPNode();
   void initLayoutResult();
   bool reset();
   void printNode(uint32_t indent = 0);
-  HPStyle getStyle();
+  HPStyle getStyle() const;
   void setStyle(const HPStyle &st);
   bool setMeasureFunc(HPMeasureFunc _measure);
   void setParent(HPNodeRef _parent);
-  HPNodeRef getParent();
+  HPNodeRef getParent() const;
   void addChild(HPNodeRef item);
   bool insertChild(HPNodeRef item, uint32_t index);
   HPNodeRef getChild(uint32_t index);
   bool removeChild(HPNodeRef child);
   bool removeChild(uint32_t index);
-  uint32_t childCount();
+  uint32_t childCount() const;
 
   void setDisplayType(DisplayType displayType);
   void setHasNewLayout(bool hasNewLayoutOrNot);
@@ -93,6 +98,7 @@ class HPNode {
   float boundAxis(FlexDirection axis, float value);
   void layout(float parentWidth,
               float parentHeight,
+              HPConfigRef config,
               HPDirection parentDirection = DirectionLTR,
               void *layoutContext = nullptr);
   float getMainAxisDim();
@@ -102,6 +108,8 @@ class HPNode {
   void setLayoutDirection(HPDirection direction);
   HPDirection getLayoutDirection();
   FlexAlign getNodeAlign(HPNodeRef item);
+  void SetConfig(HPConfigRef config);
+  HPConfigRef GetConfig() const;
 
  protected:
   HPDirection resolveDirection(HPDirection parentDirection);
@@ -135,26 +143,28 @@ class HPNode {
   void layoutFixedItems(HPSizeMode measureMode, void *layoutContext);
   void calculateFixedItemPosition(HPNodeRef item, FlexDirection axis);
 
-  void convertLayoutResult(float absLeft, float absTop);
+  void convertLayoutResult(float absLeft, float absTop, float scaleFactor);
 
  public:
   HPStyle style;
-  HPLayout result;
+  HPLayout result{};
 
   void *context;
   std::vector<HPNodeRef> children;
   HPNodeRef parent;
   HPMeasureFunc measure;
 
-  bool isFrozen;
-  bool isDirty;
-  bool _hasNewLayout;
+  bool isFrozen{};
+  bool isDirty{};
+  bool _hasNewLayout{};
   HPDirtiedFunc dirtiedFunc;
 
   // cache layout or measure positions, used if conditions are met
   HPLayoutCache layoutCache;
   // layout result is in initial state or not
   bool inInitailState;
+  HPConfigRef _config = nullptr;
+
 #ifdef LAYOUT_TIME_ANALYZE
   int fetchCount;
 #endif

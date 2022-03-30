@@ -22,13 +22,14 @@
 
 #import <UIKit/UIKit.h>
 
-#include "MTTNode.h"
-#include "MTTFlex.h"
-#include "MTTLayout.h"
+#include "HPNode.h"
+#include "Hippy.h"
 #import "HippyComponent.h"
 #import "HippyRootView.h"
-
-#import "HippyVirtualNode.h"
+#include "dom/dom_listener.h"
+#include "dom/dom_node.h"
+#include "dom/layout_node.h"
+#import "HippyDomNodeUtils.h"
 
 typedef NS_ENUM(NSUInteger, HippyUpdateLifecycle) {
     HippyUpdateLifecycleUninitialized = 0,
@@ -36,17 +37,23 @@ typedef NS_ENUM(NSUInteger, HippyUpdateLifecycle) {
     HippyUpdateLifecycleDirtied,
 };
 
-typedef void (^HippyApplierBlock)(NSDictionary<NSNumber *, UIView *> *viewRegistry);
+typedef NS_ENUM(NSUInteger, HippyCreationType) {
+    HippyCreationTypeUndetermined = 0,
+    HippyCreationTypeInstantly,
+    HippyCreationTypeLazily,
+};
 
-typedef void (^HippyApplierVirtualBlock)(NSDictionary<NSNumber *, HippyVirtualNode *> *virtualNodeRegistry);
+@class HippyShadowView;
+
+HIPPY_EXTERN CGRect getShadowViewRectFromDomNode(HippyShadowView *shadowView);
+
+typedef void (^HippyApplierBlock)(NSDictionary<NSNumber *, UIView *> *viewRegistry);
 
 /**
  * ShadowView tree mirrors Hippy view tree. Every node is highly stateful.
  * 1. A node is in one of three lifecycles: uninitialized, computed, dirtied.
- * 1. HippyBridge may call any of the padding/margin/width/height/top/left setters. A setter would dirty
- *    the node and all of its ancestors.
  * 2. At the end of each Bridge transaction, we call collectUpdatedFrames:widthConstraint:heightConstraint
- *    at the root node to recursively lay out the entire hierarchy.
+ *    at the root node to recursively layout the entire hierarchy.
  * 3. If a node is "computed" and the constraint passed from above is identical to the constraint used to
  *    perform the last computation, we skip laying out the subtree entirely.
  */
@@ -55,21 +62,42 @@ typedef void (^HippyApplierVirtualBlock)(NSDictionary<NSNumber *, HippyVirtualNo
 /**
  * HippyComponent interface.
  */
-- (NSArray<HippyShadowView *> *)hippySubviews NS_REQUIRES_SUPER;
-- (HippyShadowView *)hippySuperview NS_REQUIRES_SUPER;
-- (void)insertHippySubview:(HippyShadowView *)subview atIndex:(NSInteger)atIndex NS_REQUIRES_SUPER;
-- (void)removeHippySubview:(HippyShadowView *)subview NS_REQUIRES_SUPER;
 
-@property (nonatomic, weak, readonly) HippyShadowView *superview;
-//@property (nonatomic, assign, readonly) CSSNodeRef cssNode;
-@property (nonatomic, assign, readonly) MTTNodeRef nodeRef;
-@property (nonatomic, copy) NSString *viewName;
-@property (nonatomic, strong) UIColor *backgroundColor;  // Used to propagate to children
-@property (nonatomic, copy) HippyDirectEventBlock onLayout;
-@property (nonatomic, assign) BOOL isList;
-@property (nonatomic, weak) HippyBridge *bridge;
-@property (nonatomic, assign) MTTDirection layoutDirection;
-@property (nonatomic, copy) NSString *visibility;
+/**
+ * Get all hippy shadow views
+ */
+- (NSArray<HippyShadowView *> *)hippySubviews NS_REQUIRES_SUPER;
+
+/**
+ * Get super shadow view
+ */
+- (HippyShadowView *)hippySuperview NS_REQUIRES_SUPER;
+
+/**
+ * Insert hippy shadow view at index.
+ *
+ * @param subview A hippy shadow subview to insert
+ * @param atIndex position for hippy subview to insert
+ * @discussion atIndex must not exceed range of current index
+ */
+- (void)insertHippySubview:(HippyShadowView *)subview atIndex:(NSInteger)atIndex;
+
+/**
+ * Remove hippy shadow view
+ *
+ * @param subview A hippy shadow subview to delete
+ */
+- (void)removeHippySubview:(HippyShadowView *)subview;
+
+@property(nonatomic, weak, readonly) HippyShadowView *superview;
+@property(nonatomic, copy) NSString *viewName;
+@property(nonatomic, strong) UIColor *backgroundColor;  // Used to propagate to children
+@property(nonatomic, copy) HippyDirectEventBlock onLayout;
+@property(nonatomic, assign) BOOL isList;
+@property(nonatomic, copy) NSString *visibility;
+@property(nonatomic, assign) BOOL visibilityChanged;
+@property(nonatomic, assign) BOOL hasNewLayout;
+@property(nonatomic, readonly) BOOL confirmedLayoutDirectionDidUpdated;
 
 /**
  * isNewView - Used to track the first time the view is introduced into the hierarchy.  It is initialized YES, then is
@@ -85,81 +113,18 @@ typedef void (^HippyApplierVirtualBlock)(NSDictionary<NSNumber *, HippyVirtualNo
 @property (nonatomic, assign, getter=isHidden) BOOL hidden;
 
 /**
- * Position and dimensions.
- * Defaults to { 0, 0, NAN, NAN }.
+ * Get frame set by layout system
  */
-@property (nonatomic, assign) CGFloat top;
-@property (nonatomic, assign) CGFloat left;
-@property (nonatomic, assign) CGFloat bottom;
-@property (nonatomic, assign) CGFloat right;
-
-@property (nonatomic, assign) CGFloat width;
-@property (nonatomic, assign) CGFloat height;
-
-@property (nonatomic, assign) CGFloat minWidth;
-@property (nonatomic, assign) CGFloat maxWidth;
-@property (nonatomic, assign) CGFloat minHeight;
-@property (nonatomic, assign) CGFloat maxHeight;
-
 @property (nonatomic, assign) CGRect frame;
 
-- (void)setTopLeft:(CGPoint)topLeft;
-- (void)setSize:(CGSize)size;
+/**
+ * Get padding set by layout system
+ */
+@property(nonatomic, assign) UIEdgeInsets paddingAsInsets;
 
 /**
- * Set the natural size of the view, which is used when no explicit size is set.
- * Use UIViewNoIntrinsicMetric to ignore a dimension.
+ * Indicate whether the view corresponding to this can animate
  */
-- (void)setIntrinsicContentSize:(CGSize)size;
-
-/**
- * Border. Defaults to { 0, 0, 0, 0 }.
- */
-@property (nonatomic, assign) CGFloat borderWidth;
-@property (nonatomic, assign) CGFloat borderTopWidth;
-@property (nonatomic, assign) CGFloat borderLeftWidth;
-@property (nonatomic, assign) CGFloat borderBottomWidth;
-@property (nonatomic, assign) CGFloat borderRightWidth;
-
-/**
- * Margin. Defaults to { 0, 0, 0, 0 }.
- */
-@property (nonatomic, assign) CGFloat margin;
-@property (nonatomic, assign) CGFloat marginVertical;
-@property (nonatomic, assign) CGFloat marginHorizontal;
-@property (nonatomic, assign) CGFloat marginTop;
-@property (nonatomic, assign) CGFloat marginLeft;
-@property (nonatomic, assign) CGFloat marginBottom;
-@property (nonatomic, assign) CGFloat marginRight;
-
-/**
- * Padding. Defaults to { 0, 0, 0, 0 }.
- */
-@property (nonatomic, assign) CGFloat padding;
-@property (nonatomic, assign) CGFloat paddingVertical;
-@property (nonatomic, assign) CGFloat paddingHorizontal;
-@property (nonatomic, assign) CGFloat paddingTop;
-@property (nonatomic, assign) CGFloat paddingLeft;
-@property (nonatomic, assign) CGFloat paddingBottom;
-@property (nonatomic, assign) CGFloat paddingRight;
-
-- (UIEdgeInsets)paddingAsInsets;
-
-/**
- * Flexbox properties. All zero/disabled by default
- */
-@property (nonatomic, assign) FlexDirection flexDirection;
-@property (nonatomic, assign) FlexAlign justifyContent;
-@property (nonatomic, assign) FlexAlign alignSelf;
-@property (nonatomic, assign) FlexAlign alignItems;
-@property (nonatomic, assign) PositionType position;
-@property (nonatomic, assign) FlexWrapMode flexWrap;
-@property (nonatomic, assign) DisplayType displayType;
-@property (nonatomic, assign) CGFloat flex;
-@property (nonatomic, assign) CGFloat flexGrow;
-@property (nonatomic, assign) CGFloat flexShrink;
-@property (nonatomic, assign) CGFloat flexBasis;
-
 @property (nonatomic, assign) BOOL animated;
 
 /**
@@ -173,55 +138,41 @@ typedef void (^HippyApplierVirtualBlock)(NSDictionary<NSNumber *, HippyVirtualNo
 @property (nonatomic, assign) OverflowType overflow;
 
 /**
+ * Indicate how we create coresponding UIView
+ * HippyCreationTypeInstantly : create views instantly when HippyShadowView is created
+ * HippyCreationTypeLazily: create views when UIView is needed
+ */
+@property (nonatomic, assign) HippyCreationType creationType;
+
+/**
+ * set create type of itself and its all descendants to HippyCreationTypeInstantly
+ */
+- (void)recusivelySetCreationTypeToInstant;
+
+- (void)setDomManager:(const std::weak_ptr<hippy::DomManager>)domManager;
+- (std::weak_ptr<hippy::DomManager>)domManager;
+
+/**
+ * reset layout frame to mark dirty and re-layout
+ */
+- (void)setLayoutFrame:(CGRect)frame;
+
+/**
  * Calculate property changes that need to be propagated to the view.
  * The applierBlocks set contains HippyApplierBlock functions that must be applied
  * on the main thread in order to update the view.
  */
-
 - (void)collectUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
-            virtualApplierBlocks:(NSMutableSet<HippyApplierVirtualBlock> *)virtualApplierBlocks
                 parentProperties:(NSDictionary<NSString *, id> *)parentProperties;
-
-- (void)collectUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks parentProperties:(NSDictionary<NSString *, id> *)parentProperties;
 
 /**
  * Process the updated properties and apply them to view. Shadow view classes
  * that add additional propagating properties should override this method.
  */
 - (NSDictionary<NSString *, id> *)processUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
-                                      virtualApplierBlocks:(NSMutableSet<HippyApplierVirtualBlock> *)virtualApplierBlocks
                                           parentProperties:(NSDictionary<NSString *, id> *)parentProperties NS_REQUIRES_SUPER;
 
-- (NSDictionary<NSString *, id> *)processUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
-                                          parentProperties:(NSDictionary<NSString *, id> *)parentProperties NS_REQUIRES_SUPER;
-
-/**
- * Can be called by a parent on a child in order to calculate all views whose frame needs
- * updating in that branch. Adds these frames to `viewsWithNewFrame`. Useful if layout
- * enters a view where flex doesn't apply (e.g. Text) and then you want to resume flex
- * layout on a subview.
- */
-- (void)collectUpdatedFrames:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-                   withFrame:(CGRect)frame
-                      hidden:(BOOL)hidden
-            absolutePosition:(CGPoint)absolutePosition;
-
-/**
- * Apply the CSS layout.
- * This method also calls `applyLayoutToChildren:` internally. The functionality
- * is split into two methods so subclasses can override `applyLayoutToChildren:`
- * while using default implementation of `applyLayoutNode:`.
- */
-- (void)applyLayoutNode:(MTTNodeRef)node
-      viewsWithNewFrame:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-       absolutePosition:(CGPoint)absolutePosition NS_REQUIRES_SUPER;
-
-/**
- * Enumerate the child nodes and tell them to apply layout.
- */
-- (void)applyLayoutToChildren:(MTTNodeRef)node
-            viewsWithNewFrame:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-             absolutePosition:(CGPoint)absolutePosition;
+- (void)amendLayoutBeforeMount;
 
 /**
  * Return whether or not this node acts as a leaf node in the eyes of CSSLayout. For example
@@ -231,6 +182,8 @@ typedef void (^HippyApplierVirtualBlock)(NSDictionary<NSNumber *, HippyVirtualNo
 - (BOOL)isCSSLeafNode;
 
 - (void)dirtyPropagation NS_REQUIRES_SUPER;
+- (void)dirtySelfPropagation;
+- (void)dirtyDescendantPropagation;
 - (BOOL)isPropagationDirty;
 
 - (void)dirtyText NS_REQUIRES_SUPER;
@@ -259,5 +212,32 @@ typedef void (^HippyApplierVirtualBlock)(NSDictionary<NSNumber *, HippyVirtualNo
 - (BOOL)viewIsDescendantOf:(HippyShadowView *)ancestor;
 
 - (NSDictionary *)mergeProps:(NSDictionary *)props;
+
+/**
+ * Add event to HippyShadowView
+ * @param name event name
+ * @discussion In general, events are mounted directly on UIViews.
+ * But for the lazy loading UIViews, UIViews may not be created when events requires to mount on UIViews.
+ * So we have to mount on ShadowView temparily, and mount on UIViews when UIViews are created by HippyShadowViews
+ */
+- (void)addEventName:(const std::string &)name;
+
+/**
+ * Get all events name
+ * @return all events name
+ */
+- (const std::vector<std::string> &)allEventNames;
+
+/**
+ * clear all event names
+ */
+- (void)clearEventNames;
+
+@property(nonatomic, assign) hippy::LayoutResult nodeLayoutResult;
+
+@property(nonatomic, assign) HPDirection layoutDirection;
+@property(nonatomic, assign) HPDirection confirmedLayoutDirection;
+- (void)applyConfirmedLayoutDirectionToSubviews:(HPDirection)confirmedLayoutDirection;
+- (BOOL)isLayoutSubviewsRTL;
 
 @end

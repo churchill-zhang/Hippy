@@ -1,16 +1,16 @@
 const path = require('path');
-const alias = require('rollup-plugin-alias');
-const buble = require('rollup-plugin-buble');
-const cjs = require('rollup-plugin-commonjs');
-const replace = require('rollup-plugin-replace');
-const node = require('rollup-plugin-node-resolve');
+const alias = require('@rollup/plugin-alias');
+const { babel } = require('@rollup/plugin-babel');
+const cjs = require('@rollup/plugin-commonjs');
+const replace = require('@rollup/plugin-replace');
+const { nodeResolve } = require('@rollup/plugin-node-resolve');
 const flow = require('rollup-plugin-flow-no-whitespace');
 
 const VueVersion = require('vue/package.json').version;
-const hippyVuePackage = require('../packages/hippy-vue/package.json');
-const cssLoaderPackage = require('../packages/hippy-vue-css-loader/package.json');
-const nativeComponentsPackage = require('../packages/hippy-vue-native-components/package.json');
-const routerPackage = require('../packages/hippy-vue-router/package.json');
+const hippyVuePackage = require('../framework/js/packages/hippy-vue/package.json');
+const cssLoaderPackage = require('../framework/js/packages/hippy-vue-css-loader/package.json');
+const nativeComponentsPackage = require('../framework/js/packages/hippy-vue-native-components/package.json');
+const routerPackage = require('../framework/js/packages/hippy-vue-router/package.json');
 
 const andHippyVueString = ` and Hippy-Vue v${hippyVuePackage.version}`;
 
@@ -53,7 +53,7 @@ function resolveVue(p) {
 }
 
 function resolvePackage(src, extra = 'src') {
-  return path.resolve(__dirname, '../packages/', src, extra);
+  return path.resolve(__dirname, '../framework/js/packages/', src, extra);
 }
 
 const aliases = {
@@ -63,7 +63,7 @@ const aliases = {
   core: resolveVue('core'),
   shared: resolveVue('shared'),
   sfc: resolveVue('sfc'),
-  he: path.resolve(__dirname, '../packages/hippy-vue/src/util/entity-decoder'),
+  he: path.resolve(__dirname, '../framework/js/packages/hippy-vue/src/util/entity-decoder'),
   '@vue': resolvePackage('hippy-vue'),
   '@router': resolvePackage('hippy-vue-router'),
   '@css-loader': resolvePackage('hippy-vue-css-loader'),
@@ -109,36 +109,60 @@ function genConfig(name) {
     input: opts.entry,
     external: opts.external,
     treeshake: {
-      pureExternalModules: id => id.startsWith('weex'),
+      moduleSideEffects: id => !id.startsWith('weex'),
     },
     plugins: [
       replace({
-        __WEEX__: false,
-        __VERSION__: VueVersion,
-        'let _isServer': 'let _isServer = false',
-        'process.env.VUE_VERSION': `"${VueVersion}"`,
-        'process.env.HIPPY_VUE_VERSION': `"${hippyVuePackage.version}"`,
-      }),
-      flow(),
-      buble({
-        objectAssign: 'Object.assign',
-        transforms: {
-          arrow: true,
-          modules: false,
-          dangerousForOf: true,
+        preventAssignment: true,
+        values: {
+          __WEEX__: false,
+          __VERSION__: VueVersion,
+          'let _isServer': 'let _isServer = false',
+          'process.env.VUE_VERSION': `"${VueVersion}"`,
+          'process.env.HIPPY_VUE_VERSION': `"${hippyVuePackage.version}"`,
         },
       }),
-      alias(aliases),
-      node({
+      flow(),
+      alias({
+        entries: aliases,
+      }),
+      nodeResolve({
         preferBuiltins: true,
       }),
       cjs(),
+      babel({
+        presets: [
+          [
+            '@babel/env',
+            {
+              targets: {
+                chrome: '57',
+              },
+            },
+          ],
+        ],
+        plugins: [
+          [
+            '@babel/plugin-transform-runtime',
+            {
+              corejs: false,
+            },
+          ],
+        ],
+        babelHelpers: 'runtime',
+      }),
     ].concat(opts.plugins || []),
     output: {
       file: opts.dest,
       format: opts.format,
       banner: opts.banner,
       name: opts.moduleName || 'hippy-vue',
+      exports: 'auto',
+    },
+    onwarn: (msg, warn) => {
+      if (!/Circular/.test(msg)) {
+        warn(msg);
+      }
     },
   };
 

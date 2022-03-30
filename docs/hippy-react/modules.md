@@ -7,7 +7,7 @@
 
 # Animation
 
-[[Animation 范例]](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/src/modules/Animation/index.jsx)
+[[Animation 范例]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/src/modules/Animation/index.jsx)
 
 `Animation` 是 Hippy 提供的动画组件，可以支持传入动画配置，以及手动控制开始与结束。在 Hippy 上实现一个动画分为三个步骤：
 
@@ -27,14 +27,14 @@
 | toValue          | `number`, `string` | 是   | -      | 动画结束时候的值；如果为颜色值参考 [color](style/color.md)                                                                |
 | valueType\*      | `number`, `string` | 否   | null   | 动画的开始和结束值的类型，默认为空，代表动画起止的单位是普通 Number。 PS: Web 平台此接口只支持 number 类型传参            |
 | duration         | `number`           | 否   | -      | 动画时长，单位为毫秒(ms)                                                                                                  |
-| timingFunction\* | `string`           | 否   | linear | 动画插值器类型                                                                                                            |
-| repeatCount      | `number`, `loop`   | 否   | -      | 动画的重复次数，默认为 0，即只播放一次，为"loop"时代表无限循环播放； repeatCount 设为 n 时，则动画会播放 n 次             |
+| timingFunction\* | `string`           | 否   | linear | 动画插值器类型, 支持 `linear`，`ease-in`， `ease-out`，`ease-in-out`，`cubic-bezier`                                                                                                       |
+| repeatCount      | `number`, `loop`   | 否   | -      | 动画的重复次数，默认为 0，即只播放一次；为 -1 或者 "loop" 时代表无限循环播放； repeatCount 设为 n 时，则动画会播放 n 次             |
 
 - valueType 的参数选项：
 
   - `rad`：代表动画参数的起止值为弧度；
   - `deg`：代表动画参数的起止值为度数；
-  - `color`：代表动画参数的起止值为颜色值，可修饰背景色 `backgroundColor` 和文字颜色 `color`(仅 Android 支持)，参考 [例子](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/src/modules/Animation/index.jsx) `最低支持版本2.6.0`
+  - `color`：代表动画参数的起止值为颜色值，可修饰背景色 `backgroundColor` 和文字颜色 `color`(仅 Android 支持)，参考 [例子](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/src/modules/Animation/index.jsx) `最低支持版本2.6.0`
 
 - timingFunction 的参数选项：
   - `linear`：使用线性插值器，动画将匀速进行；
@@ -83,7 +83,7 @@
 
 # AnimationSet
 
-[[AnimationSet 范例]](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/src/modules/Animation)
+[[AnimationSet 范例]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/src/modules/Animation)
 
 `AnimationSet` 与 `Animation` 类似，都是赋予 hippy 组件的单个样式属性（如 width、height、left、right）动画能力的模块。
 
@@ -128,15 +128,11 @@
 
 `() => void` 启动动画。注意：如果调用该方法前，动画尚未经过 render 赋值给相应控件, 或该动画已经 destroy 的话，那 start 将不会生效；
 
-### updateAnimation
-
-`(options: Object) => void` 修改动画的配置参数，只需要填入需要修改的配置项即可，不需要重复填入所有的动画参数
-
 ---
 
 # AsyncStorage
 
-[[AsyncStorage 范例]](//github.com/Tencent/Hippy/tree/master/examples/hippy-react-demo/src/modules/AsyncStorage/index.jsx)
+[[AsyncStorage 范例]](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-react-demo/src/modules/AsyncStorage/index.jsx)
 
 AsyncStorage 是一个简单的、异步的、持久化的 Key-Value 存储系统，它对于 App 来说是全局性的。
 
@@ -189,11 +185,11 @@ AsyncStorage 是一个简单的、异步的、持久化的 Key-Value 存储系�
 
 # BackAndroid
 
-[[BackAndroid 范例]](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/src/pages/gallery.jsx#L171)
+[[BackAndroid 范例]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/src/pages/gallery.jsx#L171)
 
 可以监听 Android 实体键的回退，在退出前做操作或拦截实体键的回退。
 
-> 注意：该方法需要终端拦截实体返回按钮的事件，可以参考 [android-demo 的 onBackPressed 方法](//github.com/Tencent/Hippy/blob/master/examples/android-demo/example/src/main/java/com/tencent/mtt/hippy/example/MyActivity.java)
+> 注意：该方法需要终端拦截实体返回按钮的事件，可以参考 [android-demo 的 onBackPressed 方法](//github.com/Tencent/Hippy/blob/master/framework/js/examples/android-demo/example/src/main/java/com/tencent/mtt/hippy/example/MyActivity.java)
 
 ## 方法
 
@@ -217,7 +213,7 @@ AsyncStorage 是一个简单的、异步的、持久化的 Key-Value 存储系�
 
 # Clipboard
 
-[[Clipboard 范例]](//github.com/Tencent/Hippy/tree/master/examples/hippy-react-demo/src/modules/Clipboard)
+[[Clipboard 范例]](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-react-demo/src/modules/Clipboard)
 
 模块提供了 iOS/Android 双端的剪贴板能力，开发者可使用其来读取或写入剪贴板，目前仅支持字符串作为存取类型。
 
@@ -232,6 +228,33 @@ AsyncStorage 是一个简单的、异步的、持久化的 Key-Value 存储系�
 `(value: string) => void` 设置剪贴板的内容
 
 > - value: string - 需要设置到剪贴板中的内容。
+
+---
+
+# ConsoleModule
+
+提供了将前端日志输出到 iOS 终端日志和 [Android logcat](//developer.android.com/studio/command-line/logcat) 的能力
+
+## 方法
+
+### ConsoleModule.log
+
+`(...value: string) => void`
+
+### ConsoleModule.info
+
+`(...value: string) => void`
+
+### ConsoleModule.warn
+
+`(...value: string) => void`
+
+### ConsoleModule.error
+
+`(...value: string) => void`
+
+> - `log` 和 `info` 默认都输出为终端 INFO 级别日志。
+> - Hippy 2.10.0 版本之后将原始 js 的 `console` 方法与 `ConsoleModule` 方法进行分离，`console` 不再输出日志到终端。
 
 ---
 
@@ -273,7 +296,7 @@ AsyncStorage 是一个简单的、异步的、持久化的 Key-Value 存储系�
 
 # NetInfo
 
-[[NetInfo 范例]](//github.com/Tencent/Hippy/tree/master/examples/hippy-react-demo/src/modules/NetInfo)
+[[NetInfo 范例]](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-react-demo/src/modules/NetInfo)
 
 通过该接口可以获得当前设备的网络状态，也可以注册一个监听器，当系统网络切换的时候，得到一个通知。
 
@@ -408,10 +431,29 @@ AsyncStorage 是一个简单的、异步的、持久化的 Key-Value 存储系�
 
 ## 方法
 
+### UIManagerModule.callUIFunction
+
+调用组件定义的终端方法
+
+`callUIFunction(instance: ref, method: string, options: Array)`
+
+> - instance: 组件的引用 Ref
+> - method：方法名称，如 ListView 的 `scrollToIndex`
+> - options: 需传递的数据，如 ListView 的 `[xIndex, yIndex, animated]`，空时显式写 `[]`
+
+### UIManagerModule.getElementFromFiberRef
+
+获取元素 Ref 对应的 Element(类似DOM)
+
+`getElementFromFiberRef(instance: ref): ElementNode`
+
+> - instance: 组件的引用 Ref
+> - ElementNode：类似DOM，可以调用 setNativeProps 等方法
+
 ### UIManagerModule.measureInAppWindow
 
-测量在 App 窗口范围内某个组件的尺寸和位置，如果出错 callback 参数可能为字符串或者 -1
+测量在 App 窗口范围内某个组件的尺寸和位置，如果出错 callback 参数可能为字符串或者 -1，注意需要保证节点实例真正上屏后（onLayout事件后）才能调用该方法。
 
 `(ref, callback: Function) => Promise`
 
-> - callback: ({ x, y, width, height } | string | -1) => void - 回调函数, 参数可以获取到引用组件在 App 窗口范围内的坐标值和宽高，如果出错可能返回 -1 或者 `this view is null` 字符串
+> - callback: ({ x, y, width, height } | string | -1) => void - 回调函数, 参数可以获取到引用组件在 App 窗口范围内的坐标值和宽高，如果出错或者 [节点被优化（仅在Android）](hippy-react/components?id=样式内特殊属性)可能返回 -1 或者 `this view is null` 字符串

@@ -21,7 +21,7 @@
  */
 
 #import "HippyText.h"
-
+#import "HippyLog.h"
 #import "HippyShadowText.h"
 #import "HippyUtils.h"
 #import "UIView+Hippy.h"
@@ -74,6 +74,10 @@ static void collectNonTextDescendants(HippyText *view, NSMutableArray *nonTextDe
             [hippySubview removeHippySubview:subview];
         }
     }
+}
+
+- (BOOL)canBeRetrievedFromViewCache {
+    return NO;
 }
 
 - (void)hippySetInheritedBackgroundColor:(__unused UIColor *)inheritedBackgroundColor {

@@ -23,7 +23,6 @@
 #import "HippyModalHostViewManager.h"
 #import "HippyBridge.h"
 #import "HippyModalHostViewController.h"
-#import "HippyTouchHandler.h"
 #import "HippyShadowView.h"
 #import "HippyUtils.h"
 #import "HippyModalTransitioningDelegate.h"
@@ -34,19 +33,15 @@
 
 @implementation HippyModalHostShadowView
 
-- (void)insertHippySubview:(id<HippyComponent>)subview atIndex:(NSInteger)atIndex {
-    [super insertHippySubview:subview atIndex:atIndex];
-    if ([subview isKindOfClass:[HippyShadowView class]]) {
-        CGRect frame = { .origin = CGPointZero, .size = HippyScreenSize() };
-        [(HippyShadowView *)subview setFrame:frame];
-    }
+- (void)setDomManager:(const std::weak_ptr<hippy::DomManager>)domManager {
+    [super setDomManager:domManager];
+    CGRect frame = { .origin = CGPointZero, .size = HippyScreenSize() };
+    [self setLayoutFrame:frame];
 }
 
 @end
 
 @implementation HippyModalHostViewManager
-
-HIPPY_EXPORT_MODULE(Modal)
 
 HIPPY_EXPORT_VIEW_PROPERTY(animationType, NSString)
 HIPPY_EXPORT_VIEW_PROPERTY(transparent, BOOL)
@@ -59,7 +54,7 @@ HIPPY_EXPORT_VIEW_PROPERTY(primaryKey, NSString)
 HIPPY_EXPORT_VIEW_PROPERTY(hideStatusBar, NSNumber)
 
 - (UIView *)view {
-    HippyModalHostView *view = [[HippyModalHostView alloc] initWithBridge:self.bridge];
+    HippyModalHostView *view = [[HippyModalHostView alloc] init];
     view.delegate = self.transitioningDelegate;
     if (!_hostViews) {
         _hostViews = [NSHashTable weakObjectsHashTable];

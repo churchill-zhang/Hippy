@@ -10,7 +10,7 @@ Hippy 的样式排版使用了 Flex 布局。值得注意的是，尚不兼容�
 
 [[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/align-items)
 
-`alignItems`决定了子元素在次轴方向的排列方式（此样式设置在父元素上）。例如若子元素本来是沿着竖直方向排列的（即主轴竖直，次轴水平），则`alignItems`决定了它们在水平方向的排列方式。此样式和CSS中的`alignItems`表现一致，默认值为stretch。
+`alignItems`决定了子元素在次轴方向的排列方式（此样式设置在父元素上）。例如若子元素本来是沿着竖直方向排列的（即主轴竖直，次轴水平），则 `alignItems` 决定了它们在水平方向的排列方式。此样式和CSS中的`alignItems`表现一致，默认值为 `stretch`。
 
 | 类型                                                            | 必需 |
 | --------------------------------------------------------------- | -------- |
@@ -20,73 +20,12 @@ Hippy 的样式排版使用了 Flex 布局。值得注意的是，尚不兼容�
 
 [[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/align-self)
 
-`alignSelf`决定了元素在父元素的次轴方向的排列方式（此样式设置在子元素上），其值会覆盖父元素的`alignItems`的值。其表现和 CSS 上的`align-self`一致（默认值为auto）。
+`alignSelf`决定了元素在父元素的次轴方向的排列方式（此样式设置在子元素上），其值会覆盖父元素的`alignItems`的值。其表现和 CSS 上的`align-self`一致（默认值为`auto`）。
 
 | 类型                                                                    | 必需 |
 | ----------------------------------------------------------------------- | -------- |
 | enum('auto', 'flex-start', 'flex-end', 'center', 'stretch', 'baseline') | 否       |
 
-# borderBottomWidth
-
-[[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/border-bottom-width)
-
-`borderBottomWidth`和 CSS 上的`border-bottom-width`表现一致。
-
-| 类型   | 必需 |
-| ------ | -------- |
-| number | 否       |
-
-# borderLeftWidth
-
-[[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/border-left-width)
-
-`borderLeftWidth`和 CSS 上的`border-left-width`表现一致。
-
-| 类型   | 必需 |
-| ------ | -------- |
-| number | 否       |
-
-# borderRightWidth
-
-[[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/border-right-width)
-
-`borderRightWidth` 和 CSS 上的`border-right-width`表现一致。
-
-| 类型   | 必需 |
-| ------ | -------- |
-| number | 否       |
-
-# borderTopWidth
-
-[[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/border-top-width)
-
-`borderTopWidth`和 CSS 上的`border-top-width`表现一致。
-
-| 类型   | 必需 |
-| ------ | -------- |
-| number | 否       |
-
-# borderWidth
-
-[[MDN 文档]](//developer.mozilla.org/zh-CN/docs/Web/CSS/border-width)
-
-`borderWidth`和 CSS 上的`border-width`表现一致。
-
-| 类型   | 必需 |
-| ------ | -------- |
-| number | 否       |
-
-# bottom
-
-[MDN 文档](//developer.mozilla.org/zh-CN/docs/Web/CSS/bottom)
-
-`bottom` 值是指将本组件定位到距离底部多少个逻辑像素（底部的定义取决于position属性）。
-
-它的表现和 CSS 上的bottom类似，但注意在Hippy上只能使用逻辑像素值（数字单位），而不能使用百分比、em、rem、vh 或是任何其他单位。
-
-| 类型            | 必需 |
-| --------------- | -------- |
-| number | 否       |
 
 # backgroundImage
 
@@ -100,13 +39,13 @@ Hippy 的样式排版使用了 Flex 布局。值得注意的是，尚不兼容�
 
 > `2.8.1` 版本后支持终端本地图片能力，可通过 webpack `file-loader` 加载。
 
-> 渐变色目前支持 `linear-gradient`  线性渐变 `(最低支持版本 2.8.0）` [[MDN 文档]](//developer.mozilla.org/zh-CN/docs/orphaned/Web/CSS/linear-gradient())，支持使用 `linear-gradient([ [ [ <angle> | to [top | bottom] || [left | right] ],]? <color-stop>[, <color-stop>]+)` 格式; 其中 `angle` 支持 deg、turn、rad 单位；`color-stop` 支持设置多个颜色和百分比。DEMO： [HippyReact](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/src/components/View/index.jsx) [HippyVue](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-div.vue)
+> 渐变色目前支持 `linear-gradient`  线性渐变 `(最低支持版本 2.8.0）` [[MDN 文档]](//developer.mozilla.org/zh-CN/docs/orphaned/Web/CSS/linear-gradient())，支持使用 `linear-gradient([ [ [ <angle> | to [top | bottom] || [left | right] ],]? <color-stop>[, <color-stop>]+)` 格式; 其中 `angle` 支持 deg、turn、rad 单位；`color-stop` 支持设置多个颜色和百分比。DEMO： [HippyReact](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/src/components/View/index.jsx) [HippyVue](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-div.vue)
 > <br/>
 > <br/>
 > 注意：
 >
-> + Android 如果使用 `to [top | bottom] || [left | right]` 四个顶角设置渐变角度，color-stop不能使用百分比；
-> + iOS color-stop 百分比只能从小到大依次显式设置，不能部分省略，即 `red 10%, yellow 20%, blue 50%`，不能是 `red 10%, yellow 20%, blue 10%`
+> + Android 如果使用 `to [top | bottom] || [left | right]` 四个顶角设置渐变角度，`color-stop` 不能使用百分比；
+> + iOS `color-stop` 百分比只能从小到大依次显式设置，不能部分省略，即 `red 10%, yellow 20%, blue 50%`，不能是 `red 10%, yellow 20%, blue 10%`
 
 # backgroundPositionX
 
@@ -137,6 +76,22 @@ Hippy 的样式排版使用了 Flex 布局。值得注意的是，尚不兼容�
 | 类型            | 必需 |
 | --------------- | -------- |
 | enum('cover', 'contain') | 否       |
+
+# collapsable
+
+Android 里如果一个 View 只用于布局它的子组件，则它可能会为了优化而从原生布局树中移除，因此该节点 DOM 的引用会丢失。 把此属性设为 false 可以禁用这个优化，以确保对应视图在原生结构中存在。
+
+| 类型            | 必需 | 支持平台
+| --------------- | -------- | ---- |
+| enum('false'， 'true'[default]) | 否       | Android
+
+# display
+
+Hippy 默认采用 Flex 布局。同时，因为仅支持 Flex 布局，所以不需要手写 display: flex 即可使用。
+
+| 类型            | 必需 |
+| --------------- | -------- |
+| enum('flex') | 否       |
 
 # flex
 
@@ -346,6 +301,8 @@ Hippy 的样式排版使用了 Flex 布局。值得注意的是，尚不兼容�
 # overflow
 
 `overflow` 定义了子元素超过父容器宽高度后的显示情况 `overflow: hidden` 的情况会导致子元素被父容器切割超出显示范围的部分 `overflow: visible` 会让子容器正常显示全部，即使超出父容器的显示范围。
+
+!> 由于历史原因，Android 默认全部元素为 `overflow: hidden`, iOS 为 `overflow: visible`
 
 | 类型                                | 必需 |
 | ----------------------------------- | -------- |

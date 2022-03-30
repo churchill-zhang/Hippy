@@ -21,12 +21,12 @@
  */
 
 #import <UIKit/UIKit.h>
-
 #import "HippyComponent.h"
 #import "HippyViewEventProtocol.h"
+#import "HippyDefines.h"
+#include "dom/dom_node.h"
 
 @class HippyShadowView;
-@class HippyVirtualNode;
 
 @interface UIView (Hippy) <HippyComponent, HippyViewEventProtocol, HippyViewTouchHandlerProtocol>
 
@@ -39,6 +39,8 @@
 - (void)removeHippySubview:(UIView *)subview;
 - (void)resetHippySubviews;
 
+- (UIView *)hippyRootView;
+
 /**
  * HippyViewTouchHandlerProtocol interface.
  */
@@ -48,6 +50,12 @@
  * z-index, used to override sibling order in didUpdateHippySubviews.
  */
 @property (nonatomic, assign) NSInteger hippyZIndex;
+
+/**
+ * set true when hippy subviews changed, but subviews does not.
+ * set false after subviews does.
+ */
+@property (nonatomic, assign, getter=isHippySubviewsUpdated) BOOL hippySubviewsUpdated;
 
 /**
  * The hippySubviews array, sorted by zIndex. This value is cached and
@@ -66,11 +74,6 @@
  * May be overriden to disable animation, etc.
  */
 - (void)hippySetFrame:(CGRect)frame;
-
-/**
- *
- */
-- (void)didUpdateWithNode:(HippyVirtualNode *)node;
 
 /**
  * Used to improve performance when compositing views with translucent content.
@@ -108,14 +111,6 @@
 - (void)sendAttachedToWindowEvent;
 - (void)sendDetachedFromWindowEvent;
 
-#if HIPPY_DEV
-
-/**
- Tools for debugging
- */
-
-@property (nonatomic, strong, setter=_DEBUG_setHippyShadowView:) HippyShadowView *_DEBUG_hippyShadowView;
-
-#endif
+@property (nonatomic, weak) __kindof HippyShadowView *hippyShadowView;
 
 @end

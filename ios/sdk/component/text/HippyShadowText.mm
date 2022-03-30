@@ -21,7 +21,6 @@
  */
 
 #import "HippyShadowText.h"
-#import "x5LayoutUtil.h"
 #import "HippyBridge.h"
 #import "HippyConvert.h"
 #import "HippyFont.h"
@@ -30,8 +29,8 @@
 #import "HippyTextView.h"
 #import "HippyUIManager.h"
 #import "HippyUtils.h"
-#import "HippyVirtualTextNode.h"
 #import "HippyI18nUtils.h"
+#import "dom/layout_node.h"
 
 NSString *const HippyShadowViewAttributeName = @"HippyShadowViewAttributeName";
 NSString *const HippyIsHighlightedAttributeName = @"IsHighlightedAttributeName";
@@ -42,24 +41,26 @@ CGFloat const HippyTextAutoSizeWidthErrorMargin = 0.05f;
 CGFloat const HippyTextAutoSizeHeightErrorMargin = 0.025f;
 CGFloat const HippyTextAutoSizeGranularity = 0.001f;
 
-@implementation HippyShadowText
-// MTTlayout
-static MTTSize x5MeasureFunc(
-    MTTNodeRef node, float width, MeasureMode widthMeasureMode, __unused float height, __unused MeasureMode heightMeasureMode, void *layoutContext) {
-    HippyShadowText *shadowText = (__bridge HippyShadowText *)MTTNodeGetContext(node);
-    NSTextStorage *textStorage = [shadowText buildTextStorageForWidth:width widthMode:widthMeasureMode];
-    [shadowText calculateTextFrame:textStorage];
-    NSLayoutManager *layoutManager = textStorage.layoutManagers.firstObject;
-    NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
-    CGSize computedSize = [layoutManager usedRectForTextContainer:textContainer].size;
+static const CGFloat gDefaultFontSize = 14.f;
 
-    MTTSize result;
-    result.width = x5CeilPixelValue(computedSize.width);
-    if (shadowText->_effectiveLetterSpacing < 0) {
-        result.width -= shadowText->_effectiveLetterSpacing;
+@implementation HippyShadowText
+
+hippy::LayoutSize textMeasureFunc(
+    HippyShadowText *weakShadowText, float width,hippy::LayoutMeasureMode widthMeasureMode,
+                                 float height, hippy::LayoutMeasureMode heightMeasureMode, void *layoutContext) {
+    hippy::LayoutSize retSize;
+    if (weakShadowText) {
+        HippyShadowText *strongShadowText = weakShadowText;
+        NSTextStorage *textStorage = [strongShadowText buildTextStorageForWidth:width widthMode:widthMeasureMode];
+        [strongShadowText calculateTextFrame:textStorage];
+        NSLayoutManager *layoutManager = textStorage.layoutManagers.firstObject;
+        NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
+        CGSize size = [layoutManager usedRectForTextContainer:textContainer].size;
+
+        retSize.width = HippyCeilPixelValue(size.width);
+        retSize.height = HippyCeilPixelValue(size.height);
     }
-    result.height = x5CeilPixelValue(computedSize.height);
-    return result;
+    return retSize;
 }
 
 static void resetFontAttribute(NSTextStorage *textStorage) {
@@ -116,9 +117,6 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
         if (NSWritingDirectionRightToLeft ==  [[HippyI18nUtils sharedInstance] writingDirectionForCurrentAppLanguage]) {
             self.textAlign = NSTextAlignmentRight;
         }
-        // MTTlayout
-        MTTNodeSetMeasureFunc(self.nodeRef, x5MeasureFunc);
-        MTTNodeSetContext(self.nodeRef, (__bridge void *)self);
         [[NSNotificationCenter defaultCenter] addObserver:self selector:@selector(contentSizeMultiplierDidChange:)
                                                      name:HippyUIManagerWillUpdateViewsDueToContentSizeMultiplierChangeNotification
                                                    object:nil];
@@ -140,8 +138,6 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
 }
 
 - (void)contentSizeMultiplierDidChange:(__unused NSNotification *)note {
-    // MTTlayout
-    MTTNodeMarkDirty(self.nodeRef);
     [self dirtyText];
 }
 
@@ -158,7 +154,7 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
 
     NSNumber *parentTag = [[self hippySuperview] hippyTag];
     // MTTlayout
-    NSTextStorage *textStorage = [self buildTextStorageForWidth:width widthMode:MeasureModeExactly];
+    NSTextStorage *textStorage = [self buildTextStorageForWidth:width widthMode:hippy::Exactly];
     CGRect textFrame = [self calculateTextFrame:textStorage];
     UIColor *color = self.color ?: [UIColor blackColor];
     [applierBlocks addObject:^(NSDictionary<NSNumber *, UIView *> *viewRegistry) {
@@ -179,71 +175,12 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
             [(HippyTextView *)parentView performTextUpdate];
         }
     }];
-
     return parentProperties;
 }
 
-- (NSDictionary<NSString *, id> *)processUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
-                                      virtualApplierBlocks:(__unused NSMutableSet<HippyApplierVirtualBlock> *)virtualApplierBlocks
-                                          parentProperties:(NSDictionary<NSString *, id> *)parentProperties {
-    if ([[self hippySuperview] isKindOfClass:[HippyShadowText class]]) {
-        return parentProperties;
-    }
-
-    parentProperties = [super processUpdatedProperties:applierBlocks virtualApplierBlocks:virtualApplierBlocks parentProperties:parentProperties];
-
-    UIEdgeInsets padding = self.paddingAsInsets;
-    CGFloat width = self.frame.size.width - (padding.left + padding.right);
-
-    NSNumber *parentTag = [[self hippySuperview] hippyTag];
-    // MTTlayout
-    NSTextStorage *textStorage = [self buildTextStorageForWidth:width widthMode:MeasureModeExactly];
-    UIColor *color = self.color ?: [UIColor blackColor];
-    CGRect textFrame = [self calculateTextFrame:textStorage];
-    [applierBlocks addObject:^(NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-        HippyText *view = (HippyText *)viewRegistry[self.hippyTag];
-        view.textFrame = textFrame;
-        view.textStorage = textStorage;
-        view.textColor = color;
-        /**
-         * NOTE: this logic is included to support rich text editing inside multiline
-         * `<TextInput>` controls. It is required in order to ensure that the
-         * textStorage (aka attributed string) is copied over from the HippyShadowText
-         * to the HippyText view in time to be used to update the editable text content.
-         * TODO: we should establish a delegate relationship betweeen HippyTextView
-         * and its contaned HippyText element when they get inserted and get rid of this
-         */
-        UIView *parentView = viewRegistry[parentTag];
-        if ([parentView respondsToSelector:@selector(performTextUpdate)]) {
-            [(HippyTextView *)parentView performTextUpdate];
-        }
-    }];
-
-    [virtualApplierBlocks addObject:^(NSDictionary<NSNumber *, HippyVirtualNode *> *virtualRegistry) {
-        HippyVirtualTextNode *node = (HippyVirtualTextNode *)virtualRegistry[self.hippyTag];
-        node.textFrame = textFrame;
-        node.textStorage = textStorage;
-        node.textColor = color;
-    }];
-
-    return parentProperties;
-}
-// MTTlayout
-- (void)applyLayoutNode:(MTTNodeRef)node
-      viewsWithNewFrame:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-       absolutePosition:(CGPoint)absolutePosition {
-    [super applyLayoutNode:node viewsWithNewFrame:viewsWithNewFrame absolutePosition:absolutePosition];
-    [self dirtyPropagation];
-}
-
-// MTTlayout
-- (void)applyLayoutToChildren:(__unused MTTNodeRef)node
-            viewsWithNewFrame:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-             absolutePosition:(CGPoint)absolutePosition {
+- (void)amendLayoutBeforeMount {
     @try {
-        // Run layout on subviews.
-        // MTTlayout
-        NSTextStorage *textStorage = [self buildTextStorageForWidth:self.frame.size.width widthMode:MeasureModeExactly];
+        NSTextStorage *textStorage = [self buildTextStorageForWidth:self.frame.size.width widthMode:hippy::Exactly];
         NSLayoutManager *layoutManager = textStorage.layoutManagers.firstObject;
         NSTextContainer *textContainer = layoutManager.textContainers.firstObject;
         NSRange glyphRange = [layoutManager glyphRangeForTextContainer:textContainer];
@@ -251,30 +188,40 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
         [layoutManager.textStorage enumerateAttribute:HippyShadowViewAttributeName inRange:characterRange options:0 usingBlock:^(
             HippyShadowView *child, NSRange range, __unused BOOL *_) {
             if (child) {
-                MTTNodeRef childNode = child.nodeRef;
-                float width = MTTNodeLayoutGetWidth(childNode);
-                float height = MTTNodeLayoutGetHeight(childNode);
+                float width = child.nodeLayoutResult.width, height = child.nodeLayoutResult.height;
                 if (isnan(width) || isnan(height)) {
                     HippyLogError(@"Views nested within a <Text> must have a width and height");
                 }
-                UIFont *font = [textStorage attribute:NSFontAttributeName atIndex:range.location effectiveRange:nil];
+
+                /**
+                 * For RichText, a view, which is top aligment by default, should be center alignment to text,
+                 */
+
                 CGRect glyphRect = [layoutManager boundingRectForGlyphRange:range inTextContainer:textContainer];
-                CGRect childFrame = { { x5RoundPixelValue(glyphRect.origin.x),
-                                          x5RoundPixelValue(glyphRect.origin.y + glyphRect.size.height - height + font.descender) },
-                    { x5RoundPixelValue(width), x5RoundPixelValue(height) } };
-
-                NSRange truncatedGlyphRange = [layoutManager truncatedGlyphRangeInLineFragmentForGlyphAtIndex:range.location];
-                BOOL childIsTruncated = NSIntersectionRange(range, truncatedGlyphRange).length != 0;
-
-                [child collectUpdatedFrames:viewsWithNewFrame withFrame:childFrame hidden:childIsTruncated absolutePosition:absolutePosition];
+                CGRect usedOriginRect = [layoutManager lineFragmentRectForGlyphAtIndex:range.location effectiveRange:nil];
+                CGFloat lineHeight = usedOriginRect.size.height;
+                CGFloat Roundedheight = HippyRoundPixelValue(height);
+                CGFloat originY = usedOriginRect.origin.y + (lineHeight - Roundedheight) / 2;
+                CGRect childFrame = {
+                    { HippyRoundPixelValue(glyphRect.origin.x), HippyRoundPixelValue(originY) },
+                    { HippyRoundPixelValue(width), Roundedheight }
+                };
+                child.frame = childFrame;
             }
         }];
-    } @catch (NSException *exception) {
+        [super amendLayoutBeforeMount];
+    }
+    @catch (NSException *exception) {
+        [super amendLayoutBeforeMount];
     }
 }
 
-// MTTlayout
-- (NSTextStorage *)buildTextStorageForWidth:(CGFloat)width widthMode:(MeasureMode)widthMode {
+- (void)applyConfirmedLayoutDirectionToSubviews:(HPDirection)confirmedLayoutDirection {
+    [super applyConfirmedLayoutDirectionToSubviews:confirmedLayoutDirection];
+    [self dirtyText];
+}
+
+- (NSTextStorage *)buildTextStorageForWidth:(CGFloat)width widthMode:(hippy::LayoutMeasureMode)widthMode {
     // MttRN: https://github.com/Tencent/hippy-native/issues/11412
     if (isnan(width)) {
         width = 0;
@@ -299,7 +246,7 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
     }
 
     textContainer.maximumNumberOfLines = _numberOfLines;
-    textContainer.size = (CGSize) { widthMode == MeasureModeUndefined ? CGFLOAT_MAX : width, CGFLOAT_MAX };
+    textContainer.size = (CGSize) { widthMode == hippy::Undefined ? CGFLOAT_MAX : width, CGFLOAT_MAX };
 
     [layoutManager addTextContainer:textContainer];
     [layoutManager ensureLayoutForTextContainer:textContainer];
@@ -319,6 +266,26 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
 - (void)dirtyText {
     [super dirtyText];
     _cachedTextStorage = nil;
+    auto domManager = self.domManager.lock();
+    if (domManager) {
+        __weak HippyShadowView *weakSelf = self;
+        std::function<void ()> func = [weakSelf, domManager](){
+            @autoreleasepool {
+                if (weakSelf) {
+                    HippyShadowView *strongSelf = weakSelf;
+                    int32_t hippyTag = [[strongSelf hippyTag] intValue];
+                    auto domNode = domManager->GetNode(hippyTag);
+                    if (domNode) {
+                        auto layoutNode = domNode->GetLayoutNode();
+                        layoutNode->MarkDirty();
+                        [strongSelf dirtyPropagation];
+                        strongSelf.hasNewLayout = YES;
+                    }
+                }
+            }
+        };
+        domManager->PostTask(func);
+    }
 }
 
 - (void)recomputeText {
@@ -343,12 +310,25 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
                                         foregroundColor:(UIColor *)foregroundColor
                                         backgroundColor:(UIColor *)backgroundColor
                                                 opacity:(CGFloat)opacity {
+    if (!_textAlignSet) {
+        if ([self isLayoutSubviewsRTL]) {
+            self.textAlign = NSTextAlignmentRight;
+        }
+        else {
+            self.textAlign = NSTextAlignmentLeft;
+        }
+    }
+
     if (![self isTextDirty] && _cachedAttributedString) {
         return _cachedAttributedString;
     }
 
     if (_fontSize && !isnan(_fontSize)) {
         fontSize = @(_fontSize);
+    }
+    else if (nil == fontSize) {
+        //default font size is 14
+        fontSize = @(gDefaultFontSize);
     }
     if (_fontWeight) {
         fontWeight = _fontWeight;
@@ -375,6 +355,10 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
 
     CGFloat heightOfTallestSubview = 0.0;
     NSMutableAttributedString *attributedString = [[NSMutableAttributedString alloc] initWithString:self.text ?: @""];
+    if ([self isLayoutSubviewsRTL]) {
+        NSDictionary *dic = @{NSWritingDirectionAttributeName: @[@(NSWritingDirectionRightToLeft | NSWritingDirectionEmbedding)]};
+        [attributedString addAttributes:dic range:NSMakeRange(0, [self.text length])];
+    }
     for (HippyShadowView *child in [self hippySubviews]) {
         if ([child isKindOfClass:[HippyShadowText class]]) {
             HippyShadowText *shadowText = (HippyShadowText *)child;
@@ -387,19 +371,29 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
                                                                                          opacity:opacity * shadowText.opacity]];
             [child setTextComputed];
         } else {
-            // MTTlayout
-            NSWritingDirection direction = [[HippyI18nUtils sharedInstance] writingDirectionForCurrentAppLanguage];
-            MTTDirection nodeDirection = (NSWritingDirectionRightToLeft == direction) ? DirectionRTL : DirectionLTR;
-            nodeDirection = self.layoutDirection != DirectionInherit ? self.layoutDirection : nodeDirection;
-            MTTNodeDoLayout(child.nodeRef, NAN, NAN, nodeDirection);
-            float width = MTTNodeLayoutGetWidth(child.nodeRef);
-            float height = MTTNodeLayoutGetHeight(child.nodeRef);
+            float width = 0, height = 0;
+            auto domManager = [child domManager].lock();
+            if (domManager) {
+                int32_t hippyTag = [child.hippyTag intValue];
+                auto domNode = domManager->GetNode(hippyTag);
+                if (domNode) {
+                    domNode->DoLayout();
+                    width = domNode->GetLayoutResult().width;
+                    height = domNode->GetLayoutResult().height;
+                    child.nodeLayoutResult = domNode->GetLayoutResult();
+                }
+            }
             if (isnan(width) || isnan(height)) {
                 HippyLogError(@"Views nested within a <Text> must have a width and height");
             }
-
+            static UIImage *placehoderImage = nil;
+            static dispatch_once_t onceToken;
+            dispatch_once(&onceToken, ^{
+                placehoderImage = [[UIImage alloc] init];
+            });
             NSTextAttachment *attachment = [NSTextAttachment new];
             attachment.bounds = (CGRect) { CGPointZero, { width, height } };
+            attachment.image = placehoderImage;
             NSMutableAttributedString *attachmentString = [NSMutableAttributedString new];
             [attachmentString appendAttributedString:[NSAttributedString attributedStringWithAttachment:attachment]];
             [attachmentString addAttribute:HippyShadowViewAttributeName value:child range:(NSRange) { 0, attachmentString.length }];
@@ -432,9 +426,6 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
 
     // create a non-mutable attributedString for use by the Text system which avoids copies down the line
     _cachedAttributedString = [[NSAttributedString alloc] initWithAttributedString:attributedString];
-    // MTTlayout
-    MTTNodeMarkDirty(self.nodeRef);
-
     return _cachedAttributedString;
 }
 
@@ -455,7 +446,9 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
                               fontLineHeight:(CGFloat)fontLineHeight
                       heightOfTallestSubview:(CGFloat)heightOfTallestSubview {
     NSTextStorage *textStorage = [[NSTextStorage alloc] initWithAttributedString:attributedString];
-
+    if (fabs(_lineHeight - 0) < DBL_EPSILON) {
+        _lineHeight = fontLineHeight;
+    }
     // check if we have lineHeight set on self
     __block BOOL hasParagraphStyle = NO;
     if (_lineHeight || _textAlignSet) {
@@ -510,12 +503,16 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
         paragraphStyle.maximumLineHeight = maxHeight;
         [attributedString addAttribute:NSParagraphStyleAttributeName value:paragraphStyle range:(NSRange) { 0, attributedString.length }];
 
+        /**
+         * for keeping text ertical center, we need to set baseline offset
+         */
         if (lineHeight > fontLineHeight) {
-            [attributedString addAttribute:NSBaselineOffsetAttributeName value:@(newLineHeight / 2 - maximumFontLineHeight / 2)
+            CGFloat baselineOffset = newLineHeight / 2 - maximumFontLineHeight / 2;
+            [attributedString addAttribute:NSBaselineOffsetAttributeName value:@(baselineOffset)
                                      range:(NSRange) { 0, attributedString.length }];
         }
     }
-
+    _maximumFontLineHeight = maximumFontLineHeight;
     // Text decoration
     if (_textDecorationLine == HippyTextDecorationLineTypeUnderline || _textDecorationLine == HippyTextDecorationLineTypeUnderlineStrikethrough) {
         [self _addAttribute:NSUnderlineStyleAttributeName withValue:@(_textDecorationStyle) toAttributedString:attributedString];
@@ -535,6 +532,13 @@ static void resetFontAttribute(NSTextStorage *textStorage) {
         shadow.shadowBlurRadius = _textShadowRadius;
         shadow.shadowColor = _textShadowColor;
         [self _addAttribute:NSShadowAttributeName withValue:shadow toAttributedString:attributedString];
+    }
+}
+
+- (void)didSetProps:(NSArray<NSString *> *)changedProps {
+    [super didSetProps:changedProps];
+    if ([changedProps containsObject:@"textAlign"]) {
+        _textAlignSet = YES;
     }
 }
 
@@ -686,8 +690,26 @@ HIPPY_TEXT_PROPERTY(TextShadowColor, _textShadowColor, UIColor *);
 
 - (void)setTextAlign:(NSTextAlignment)textAlign {
     _textAlign = textAlign;
-    _textAlignSet = YES;
     [self dirtyText];
+}
+
+- (void)setDomManager:(const std::weak_ptr<hippy::DomManager>)domManager {
+    [super setDomManager:domManager];
+    auto shared_domNode = domManager.lock();
+    if (shared_domNode) {
+        int32_t hippyTag = [self.hippyTag intValue];
+        auto node = shared_domNode->GetNode(hippyTag);
+        if (node) {
+            __weak HippyShadowText *weakSelf = self;
+            hippy::MeasureFunction measureFunc =
+                [weakSelf](float width, hippy::LayoutMeasureMode widthMeasureMode,
+                                     float height, hippy::LayoutMeasureMode heightMeasureMode, void *layoutContext){
+                return textMeasureFunc(weakSelf, width, widthMeasureMode,
+                                       height, heightMeasureMode, layoutContext);
+            };
+            node->GetLayoutNode()->SetMeasureFunction(measureFunc);
+        }
+    }
 }
 
 /*

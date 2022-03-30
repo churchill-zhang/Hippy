@@ -23,7 +23,7 @@
 
 # button
 
-[[范例：demo-button.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-button.vue)
+[[范例：demo-button.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-button.vue)
 
 该组件映射到 View 上是因为它是一个可点击的容器，容器里面可以放图片、也可以放文本。但是因为 View 不能包裹文本，所以需要在 `<button>` 里包裹其它文本组件才能显示文字，这个跟浏览器不一样，浏览器的 `<button>` 也可以包裹 `<span>` 组件，所以这只是需要开发时注意一下。
 
@@ -42,7 +42,7 @@
 
 # div
 
-[[范例：demo-div.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-div.vue)
+[[范例：demo-div.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-div.vue)
 
 > div 组件容器，默认不可以滚动。可以通过增加样式参数 `overflow-y: scroll` 切换为可以纵向滚动容器，或者增加样式参数 `overflow-x: scroll` 切换为水平滚动容器。在终端侧会被映射成 [ScrollView](hippy-react/components.md?id=ScrollView)，因此具备 [ScrollView](hippy-react/components.md?id=ScrollView) 通用的能力。
 
@@ -50,23 +50,26 @@
 
 | 参数               | 描述                                                         | 类型                                 | 支持平台  |
 | ------------------ | ------------------------------------------------------------ | ------------------------------------ | --------- |
-| accessibilityLabel | 设置当用户与此元素交互时，“读屏器”（对视力障碍人士的辅助功能）阅读的文字。默认情况下，这个文字会通过遍历所有的子元素并累加所有的文本标签来构建。 | `node`                               | `ALL`     |
+| accessibilityLabel | 设置当用户与此元素交互时，“读屏器”（对视力障碍人士的辅助功能）阅读的文字。默认情况下，这个文字会通过遍历所有的子元素并累加所有的文本标签来构建。 | `string`                               | `ALL`     |
 | accessible         | 当此属性为 `true` 时，表示此视图时一个启用了无障碍功能的元素。默认情况下，所有可触摸操作的元素都是无障碍功能元素。 | `boolean`                            | `ALL`     |
 | style              | -                                                            | [`View Styles`](style/layout.md) | `ALL`     |
 | opacity            | 配置 `View` 的透明度，同时会影响子节点的透明度               | `number`                             | `ALL`     |
-| overflow           | 指定当子节点内容溢出其父级 `View` 容器时, 是否剪辑内容       | `enum`(visible, hidden)         | `ALL`     |
+| overflow           | 指定当子节点内容溢出其父级 `View` 容器时, 是否剪辑内容       | `enum(visible, hidden)`         | `ALL`     |
 | focusable          | 允许使用遥控器触发 View 的激活状态，改为 true 后使用遥控器将能触发 div 的 `@focus` 事件，需要通过 `nextFocusDownId`、`nextFocusUpId`、`nextFocusLeftId`、`nextFocusRightId` 参数指明四个方向键将移动到的的节点 ID       | `boolean`         | `Android`     |
 | scrollEventThrottle            | 指定滑动事件的回调频率，传入数值指定了多少毫秒(ms)组件会调用一次 `onScroll` 回调事件。（仅在 overflow-y/x: scroll 时适用） | `number`                                                     | `ALL`    |
 | pagingEnabled                  | 当值为 `true` 时，滚动条会停在滚动视图的尺寸的整数倍位置。这个可以用在水平分页上。`default: false`（仅在 overflow-y/x: scroll 时适用） | `boolean`                                                    | `ALL`    |
+| bounces | 是否开启回弹效果，默认 `true`（仅在 overflow-y/x: scroll 时适用） | `boolean`                                                  | `iOS`    |
 | scrollEnabled                  | 当值为 `false` 的时候，内容不能滚动。`default: true` （仅在 overflow-y/x: scroll 时适用） | `boolean`                                                    | `ALL`    |
+| showScrollIndicator            | 是否显示滚动条。 `default: false`（仅在 overflow-y/x: scroll 时适用） | `boolean`  | `Android`    |
 | showsHorizontalScrollIndicator | 当此值设为 `false` 的时候，`ScrollView` 会隐藏水平的滚动条。`default: true` （仅在 overflow-y/x: scroll 时适用）| `boolean`                                                    | `iOS`    |
-| showsVerticalScrollIndicator   | 当此值设为 `false` 的时候，`ScrollView` 会隐藏垂直的滚动条。 `default: true` （仅在 overflow-y/x: scroll 时适用）| `boolean`
+| showsVerticalScrollIndicator   | 当此值设为 `false` 的时候，`ScrollView` 会隐藏垂直的滚动条。 `default: true` （仅在 overflow-y/x: scroll 时适用）| `boolean`  | `iOS`   |
+| nativeBackgroundAndroid        | 配置水波纹效果，`最低支持版本 2.13.1`；配置项为 `{ borderless: boolean, color: Color, rippleRadius: number }`； `borderless` 表示波纹是否有边界，默认false；`color` 波纹颜色；`rippleRadius` 波纹半径，若不设置，默认容器边框为边界； `注意：设置水波纹后默认不显示，需要在对应触摸事件中调用 setPressed 和 setHotspot 方法进行水波纹展示，详情参考相关`[demo](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-div.vue) | `Object`| `Android`    |
 
-## 样式内特殊属性
+## style 样式内特殊属性
 
 | 参数               | 描述                                                         | 类型                                 | 支持平台  |
 | ------------------ | ------------------------------------------------------------ | ------------------------------------ | --------- |
-| collapsable        | 如果一个 `div` 只用于布局它的子组件，则它可能会为了优化而从原生布局树中移除，因此该节点 DOM 的引用会丢失。。 把此属性设为 `false` 可以禁用这个优化，以确保对应视图在原生结构中存在。 | `boolean`                            | `Android` |
+| collapsable        | 如果一个 `div` 只用于布局它的子组件，则它可能会为了优化而从原生布局树中移除，因此该节点 DOM 的引用会丢失`（比如调用 measureInAppWindow 无法获取到大小和位置信息）`。 把此属性设为 `false` 可以禁用这个优化，以确保对应视图在原生结构中存在。(也可设置为 Attribute 属性) | `boolean`                            | `Android` |
 
 ---
 
@@ -99,11 +102,29 @@
 > * y: number - Y 偏移值
 > * duration: number | boolean - 毫秒为单位的滚动时间, 默认 1000ms，false 等同 0ms
 
+### setPressed
+
+[[setPressed 范例]](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-ripple-div.vue)
+
+`最低支持版本 2.13.1`
+
+`(pressed: boolean) => void` 通过传入一个布尔值，通知终端当前是否需要显示水波纹效果
+
+> * pressed: boolean - true 显示水波纹，false 收起水波纹
+
+### setHotspot
+
+[[setHotspot 范例]](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-ripple-div.vue)
+
+`最低支持版本 2.13.1`
+
+`(x: number, y: number) => void` 通过传入一个 `x, y` 坐标值，通知终端设置当前波纹中心位置
+
 ---
 
 # form
 
-[[范例：demo-div.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-div.vue)
+[[范例：demo-div.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-div.vue)
 
 别的组件容器。 一切同 [div](hippy-vue/components.md?id=div)。
 
@@ -111,7 +132,7 @@
 
 # iframe
 
-[[范例：demo-iframe.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-iframe.vue)
+[[范例：demo-iframe.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-iframe.vue)
 
 内嵌网页容器。
 
@@ -120,18 +141,22 @@
 | 参数               | 描述                                                         | 类型                                 | 支持平台  |
 | ------------------ | ------------------------------------------------------------ | ------------------------------------ | --------- |
 | src | 内嵌用的网址 | `string`                               | `ALL`     |
+| method | 请求方式，`get`、`post` | `string`   | `ALL`    |
+| userAgent | Webview userAgent | `string` | `ALL`|
 
 ## 事件
 
 | 事件名称          | 描述                                                         | 类型                                      | 支持平台 |
 | ------------- | ------------------------------------------------------------ | ----------------------------------------- | -------- |
-| load           | 网页加载成功后会触发 | `Function`                           | `ALL`     |
+| load           | 网页加载成功后会触发 | `(object: { url:string }) => void`    | `ALL`     |
+| loadStart           | 网页开始加载时触发 | `(object: { url:string }) => void`    | `ALL`     |
+| loadEnd           | 网页加载结束时触发 | `(object: { url:string }) => void`    | `ALL`     |
 
 ---
 
 # img
 
-[[范例：demo-img.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-img.vue)
+[[范例：demo-img.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-img.vue)
 
 图片组件，和浏览器的一样。
 
@@ -170,7 +195,7 @@
 
 # input
 
-[[范例：demo-input.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-input.vue)
+[[范例：demo-input.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-input.vue)
 
 单行文本组件。
 
@@ -221,16 +246,17 @@
 
 | 参数                  | 描述                                                         | 类型                                                         | 支持平台  |
 | --------------------- | ------------------------------------------------------------ | ------------------------------------------------------------ | --------- |
+| caret-color           | 输入光标颜色。(也可设置为 Style 属性) `最低支持版本2.11.5` | [`color`](style/color.md)        | `Android`     |
 | defaultValue          | 提供一个文本框中的初始值。当用户开始输入的时候，值就可以改变。  在一些简单的使用情形下，如果你不想用监听消息然后更新 value 属性的方法来保持属性和状态同步的时候，就可以用 defaultValue 来代替。 | `string`                                                     | `ALL`     |
 | disabled              | 如果为 true                           | `boolean`                                                    | `ALL`     |
-| type          | 决定弹出的何种软键盘的。 注意，`password`仅在属性 `multiline=false` 单行文本框时生效。 | `enum`(default, numeric, password, email, phone-pad) | `ALL`     |
+| type          | 决定弹出的何种软键盘的。 注意，`password`仅在属性 `multiline=false` 单行文本框时生效。 | `enum(default, numeric, password, email, phone-pad)` | `ALL`     |
 | maxlength             | 限制文本框中最多的字符数。使用这个属性而不用JS 逻辑去实现，可以避免闪烁的现象。 | `numbers`                                                    | `ALL`     |
-| numberOfLines         | 设置 `input` 的最大行数，在使用的时候必需同时设置 `multiline` 参数为 `true`。 | `number`                                                     | `ALL`     |
+| numberOfLines         | 设置 input 最大显示行数，如果 TextInput 没有显式设置高度，会根据 numberOfLines 来计算高度撑开。在使用的时候必需同时设置 multiline 参数为 true。 | `number`                                                     | `Android`     |
 | placeholder           | 如果没有任何文字输入，会显示此字符串。                       | `string`                                                     | `ALL`     |
-| placeholderTextColor  | 占位字符串显示的文字颜色。                                   | [`color`](style/color.md)                                | `ALL`     |
-| returnKeyType         | 指定软键盘的回车键显示的样式。                               | `enum`(done, go, next, search, send)              | `ALL`     |
+| placeholder-text-color  | 占位字符串显示的文字颜色。（也可设置为 Style 属性）  `最低支持版本2.13.4`                                   | [`color`](style/color.md)                                | `ALL`     |
+| underline-color-android  | `input` 下底线的颜色。 可以设置为 'transparent' 来去掉下底线。（也可设置为 Style 属性）  `最低支持版本2.13.4`      | [`color`](style/color.md)                                                      | `Android` |
+| returnKeyType         | 指定软键盘的回车键显示的样式。                               | `enum(done, go, next, search, send)`              | `ALL`     |
 | value                 | 指定 `input` 组件的值。                                  | `string`                                                     | `ALL`     |
-| autoFocus             | 组件渲染时自动获得焦点。                                       | `boolean`                                                    | `ALL`     |
 
 ## 事件
 
@@ -279,7 +305,7 @@
 
 # label
 
-[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-p.vue)
+[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-p.vue)
 
 显示文本。 一切同 [p](hippy-vue/components.md?id=p)。
 
@@ -296,17 +322,20 @@
 
 # ul
 
-[[范例：demo-list.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-list.vue)
+[[范例：demo-list.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-list.vue)
 
-Hippy 的重点功能，高性能的可复用列表组件。里面第一层只能包含 `<li>`。
+Hippy 的重点功能，高性能的可复用列表组件，在终端侧会被映射成 `ListView`，包含 `ListView` 所有能力。里面第一层只能包含 `<li>`。
 
 ## 参数
 
 | 参数                  | 描述                                                         | 类型                                                        | 支持平台 |
 | --------------------- | ------------------------------------------------------------ | ----------------------------------------------------------- | -------- |
 | horizontal       | 指定 `ul` 是否采用横向布局。`default: undefined` | `any`   | `Android`    |
-| initialContentOffset  | 初始位移值 -- 在列表初始化时即可指定滚动距离，避免初始化后再通过 scrollTo 系列方法产生的闪动。Android 在 `2.8.0` 版本后支持    | `number`  | `ALL`
+| initialContentOffset  | 初始位移值 -- 在列表初始化时即可指定滚动距离，避免初始化后再通过 scrollTo 系列方法产生的闪动。Android 在 `2.8.0` 版本后支持    | `number`  | `ALL` |
+| bounces | 是否开启回弹效果，默认 `true` | `boolean`                                                  | `iOS`    |
+| overScrollEnabled | 是否开启回弹效果，默认 `true` | `boolean`                                                  | `Android`    |
 | rowShouldSticky  | 设置 `ul` 是否需要开启悬停效果能力，与 `li` 的 `sticky` 配合使用   | `boolean`                                                    | `ALL`
+| scrollEnabled    | 滑动是否开启。`default: true` | `boolean` | `All` |
 | scrollEventThrottle   | 指定滑动事件的回调频率，传入数值指定了多少毫秒(ms)组件会调用一次 `onScroll` 回调事件，默认 200ms | `number`                                                    | `ALL`    |
 | showScrollIndicator   | 是否显示垂直滚动条。 因为目前 ListView 其实仅有垂直滚动一种方向，水平滚动会导致 `onEndReached` 等一堆问题暂不建议使用，所以 `showScrollIndicator` 也仅用来控制是否显示垂直滚动条。 | `boolean`                                                   | `ALL`    |
 | preloadItemNumber     | 指定当列表滚动至倒数第几行时触发 `onEndReached` 回调。 | `number` | `ALL` |
@@ -352,7 +381,7 @@ Hippy 的重点功能，高性能的可复用列表组件。里面第一层只�
 
 ul 的子节点，终端层节点回收和复用的最小颗粒度。
 
-[[范例：demo-list.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-list.vue)
+[[范例：demo-list.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-list.vue)
 
 ## 参数
 
@@ -372,7 +401,7 @@ ul 的子节点，终端层节点回收和复用的最小颗粒度。
 
 # p
 
-[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-p.vue)
+[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-p.vue)
 
 显示文本，不过因为 Hippy 下没有 `display: inline` 的显示模式，默认全部都是 flex 的。
 
@@ -391,7 +420,7 @@ ul 的子节点，终端层节点回收和复用的最小颗粒度。
 | ------------- | ------------------------------------------------------------ | ----------------------------------------- | -------- |
 | numberOfLines | 用来当文本过长的时候裁剪文本。包括折叠产生的换行在内，总的行数不会超过这个属性的限制。 | `number`                                  | `ALL`    |
 | opacity       | 配置 `View` 的透明度，同时会影响子节点的透明度。             | `number`                                  | `ALL`    |
-| ellipsizeMode* | 当设定了 `numberOfLines` 值后，这个参数指定了字符串如何被截断。所以在使用 `ellipsizeMode` 时，必须得同时指定 `numberOfLines` 数值。 | `enum`(head, middle, tail, clip)| `Android 仅支持 tail 属性，iOS 全支持`    |
+| ellipsizeMode* | 当设定了 `numberOfLines` 值后，这个参数指定了字符串如何被截断。所以在使用 `ellipsizeMode` 时，必须得同时指定 `numberOfLines` 数值。 | `enum(head, middle, tail, clip)` | `Android 仅支持 tail 属性，iOS 全支持`    |
 
 * ellipsizeMode 的参数含义：
   * `clip` - 超过指定行数的文字会被直接截断，不显示“...”；（仅iOS支持）
@@ -403,7 +432,7 @@ ul 的子节点，终端层节点回收和复用的最小颗粒度。
 
 # span
 
-[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-p.vue)
+[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-p.vue)
 
 显示文本。 一切同 [p](hippy-vue/components.md?id=p)。
 
@@ -420,6 +449,6 @@ ul 的子节点，终端层节点回收和复用的最小颗粒度。
 
 # textarea
 
-[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/examples/hippy-vue-demo/src/components/demos/demo-textarea.vue)
+[[范例：demo-p.vue]](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-vue-demo/src/components/demos/demo-textarea.vue)
 
 多行文本输入框。 一切同 [input](hippy-vue/components.md?id=input)。

@@ -27,23 +27,14 @@
 #import "HippyUtils.h"
 #import "UIView+Hippy.h"
 #import "UIView+Private.h"
-#import "MTTNode.h"
+#import "HPNode.h"
 #import "HippyI18nUtils.h"
+#import "UIView+DirectionalLayout.h"
+#include "dom/layout_node.h"
 
 static NSString *const HippyBackgroundColorProp = @"backgroundColor";
 
-typedef NS_ENUM(unsigned int, meta_prop_t) {
-    META_PROP_LEFT,
-    META_PROP_TOP,
-    META_PROP_RIGHT,
-    META_PROP_BOTTOM,
-    META_PROP_HORIZONTAL,
-    META_PROP_VERTICAL,
-    META_PROP_ALL,
-    META_PROP_COUNT,
-};
-
-@implementation HippyShadowView {
+@interface HippyShadowView () {
     HippyUpdateLifecycle _propagationLifecycle;
     HippyUpdateLifecycle _textLifecycle;
     NSDictionary *_lastParentProperties;
@@ -52,150 +43,32 @@ typedef NS_ENUM(unsigned int, meta_prop_t) {
     BOOL _recomputeMargin;
     BOOL _recomputeBorder;
     BOOL _didUpdateSubviews;
-    float _paddingMetaProps[META_PROP_COUNT];
-    float _marginMetaProps[META_PROP_COUNT];
-    float _borderMetaProps[META_PROP_COUNT];
+    NSInteger _isDecendantOfLazilyShadowView;
+    std::weak_ptr<hippy::DomManager> _domManager;
+    std::vector<std::string> _eventNames;
 }
+
+@end
+
+@implementation HippyShadowView
 
 @synthesize hippyTag = _hippyTag;
 @synthesize props = _props;
 @synthesize rootTag = _rootTag;
 @synthesize parent = _parent;
+@synthesize tagName =_tagName;
 
-// not used function
-// static void HippyPrint(void *context)
-//{
-//  HippyShadowView *shadowView = (__bridge HippyShadowView *)context;
-//  printf("%s(%zd), ", shadowView.viewName.UTF8String, shadowView.hippyTag.integerValue);
-//}
-#define DEFINE_PROCESS_META_PROPS(type)                                                                \
-    static void HippyProcessMetaProps##type(const float metaProps[META_PROP_COUNT], MTTNodeRef node) { \
-        if (!isnan(metaProps[META_PROP_LEFT])) {                                                       \
-            MTTNodeStyleSet##type(node, CSSLeft, metaProps[META_PROP_LEFT]);                           \
-        } else if (!isnan(metaProps[META_PROP_HORIZONTAL])) {                                          \
-            MTTNodeStyleSet##type(node, CSSLeft, metaProps[META_PROP_HORIZONTAL]);                     \
-        } else if (!isnan(metaProps[META_PROP_ALL])) {                                                 \
-            MTTNodeStyleSet##type(node, CSSLeft, metaProps[META_PROP_ALL]);                            \
-        } else {                                                                                       \
-            MTTNodeStyleSet##type(node, CSSLeft, 0);                                                   \
-        }                                                                                              \
-                                                                                                       \
-        if (!isnan(metaProps[META_PROP_RIGHT])) {                                                      \
-            MTTNodeStyleSet##type(node, CSSRight, metaProps[META_PROP_RIGHT]);                         \
-        } else if (!isnan(metaProps[META_PROP_HORIZONTAL])) {                                          \
-            MTTNodeStyleSet##type(node, CSSRight, metaProps[META_PROP_HORIZONTAL]);                    \
-        } else if (!isnan(metaProps[META_PROP_ALL])) {                                                 \
-            MTTNodeStyleSet##type(node, CSSRight, metaProps[META_PROP_ALL]);                           \
-        } else {                                                                                       \
-            MTTNodeStyleSet##type(node, CSSRight, 0);                                                  \
-        }                                                                                              \
-                                                                                                       \
-        if (!isnan(metaProps[META_PROP_TOP])) {                                                        \
-            MTTNodeStyleSet##type(node, CSSTop, metaProps[META_PROP_TOP]);                             \
-        } else if (!isnan(metaProps[META_PROP_VERTICAL])) {                                            \
-            MTTNodeStyleSet##type(node, CSSTop, metaProps[META_PROP_VERTICAL]);                        \
-        } else if (!isnan(metaProps[META_PROP_ALL])) {                                                 \
-            MTTNodeStyleSet##type(node, CSSTop, metaProps[META_PROP_ALL]);                             \
-        } else {                                                                                       \
-            MTTNodeStyleSet##type(node, CSSTop, 0);                                                    \
-        }                                                                                              \
-                                                                                                       \
-        if (!isnan(metaProps[META_PROP_BOTTOM])) {                                                     \
-            MTTNodeStyleSet##type(node, CSSBottom, metaProps[META_PROP_BOTTOM]);                       \
-        } else if (!isnan(metaProps[META_PROP_VERTICAL])) {                                            \
-            MTTNodeStyleSet##type(node, CSSBottom, metaProps[META_PROP_VERTICAL]);                     \
-        } else if (!isnan(metaProps[META_PROP_ALL])) {                                                 \
-            MTTNodeStyleSet##type(node, CSSBottom, metaProps[META_PROP_ALL]);                          \
-        } else {                                                                                       \
-            MTTNodeStyleSet##type(node, CSSBottom, 0);                                                 \
-        }                                                                                              \
-    }
-
-DEFINE_PROCESS_META_PROPS(Padding);
-DEFINE_PROCESS_META_PROPS(Margin);
-DEFINE_PROCESS_META_PROPS(Border);
-
-// The absolute stuff is so that we can take into account our absolute position when rounding in order to
-// snap to the pixel grid. For example, say you have the following structure:
-//
-// +--------+---------+--------+
-// |        |+-------+|        |
-// |        ||       ||        |
-// |        |+-------+|        |
-// +--------+---------+--------+
-//
-// Say the screen width is 320 pts so the three big views will get the following x bounds from our layout system:
-// {0, 106.667}, {106.667, 213.333}, {213.333, 320}
-//
-// Assuming screen scale is 2, these numbers must be rounded to the nearest 0.5 to fit the pixel grid:
-// {0, 106.5}, {106.5, 213.5}, {213.5, 320}
-// You'll notice that the three widths are 106.5, 107, 106.5.
-//
-// This is great for the parent views but it gets trickier when we consider rounding for the subview.
-//
-// When we go to round the bounds for the subview in the middle, it's relative bounds are {0, 106.667}
-// which gets rounded to {0, 106.5}. This will cause the subview to be one pixel smaller than it should be.
-// this is why we need to pass in the absolute position in order to do the rounding relative to the screen's
-// grid rather than the view's grid.
-//
-// After passing in the absolutePosition of {106.667, y}, we do the following calculations:
-// absoluteLeft = round(absolutePosition.x + viewPosition.left) = round(106.667 + 0) = 106.5
-// absoluteRight = round(absolutePosition.x + viewPosition.left + viewSize.left) + round(106.667 + 0 + 106.667) = 213.5
-// width = 213.5 - 106.5 = 107
-// You'll notice that this is the same width we calculated for the parent view because we've taken its position into account.
-
-- (void)applyLayoutNode:(MTTNodeRef)node
-      viewsWithNewFrame:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-       absolutePosition:(CGPoint)absolutePosition {
-    if (!MTTNodeHasNewLayout(node)) {
-        return;
-    }
-    MTTNodesetHasNewLayout(node, false);
-    float left = MTTNodeLayoutGetLeft(node);
-    float top = MTTNodeLayoutGetTop(node);
-    if (!MTTNodeGetParent(_nodeRef)) {
-        left = MTTNodeLayoutGetPosition(_nodeRef, CSSLeft);
-        top = MTTNodeLayoutGetPosition(_nodeRef, CSSTop);
-    }
-    float width = MTTNodeLayoutGetWidth(node);
-    float height = MTTNodeLayoutGetHeight(node);
-    CGPoint absoluteTopLeft = { absolutePosition.x + left, absolutePosition.y + top };
-
-    CGPoint absoluteBottomRight = { absolutePosition.x + left + width,
-        absolutePosition.y + top + height };
-
-    CGRect frame = { {
-                         HippyRoundPixelValue(left),
-                         HippyRoundPixelValue(top),
-                     },
-        { HippyRoundPixelValue(absoluteBottomRight.x - absoluteTopLeft.x), HippyRoundPixelValue(absoluteBottomRight.y - absoluteTopLeft.y) } };
-
-    if (!CGRectEqualToRect(frame, _frame)) {
-        _frame = frame;
-        [viewsWithNewFrame addObject:self];
-    }
-
-    absolutePosition.x += MTTNodeLayoutGetLeft(node);
-    absolutePosition.y += MTTNodeLayoutGetTop(node);
-
-    [self applyLayoutToChildren:node viewsWithNewFrame:viewsWithNewFrame absolutePosition:absolutePosition];
-}
-
-- (void)applyLayoutToChildren:(MTTNodeRef)node
-            viewsWithNewFrame:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-             absolutePosition:(CGPoint)absolutePosition {
-    for (unsigned int i = 0; i < MTTNodeChildCount(node); ++i) {
-        HippyShadowView *child = (HippyShadowView *)_hippySubviews[i];
-        [child applyLayoutNode:MTTNodeGetChild(node, i) viewsWithNewFrame:viewsWithNewFrame absolutePosition:absolutePosition];
+- (void)amendLayoutBeforeMount {
+    if (HippyUpdateLifecycleDirtied == _propagationLifecycle || _visibilityChanged) {
+        _visibilityChanged = NO;
+        for (HippyShadowView *shadowView in self.hippySubviews) {
+            [shadowView amendLayoutBeforeMount];
+        }
     }
 }
 
 - (NSDictionary<NSString *, id> *)processUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
                                           parentProperties:(NSDictionary<NSString *, id> *)parentProperties {
-    // TODO: we always refresh all propagated properties when propagation is
-    // dirtied, but really we should track which properties have changed and
-    // only update those.
-
     if (_didUpdateSubviews) {
         _didUpdateSubviews = NO;
         [self didUpdateHippySubviews];
@@ -205,7 +78,14 @@ DEFINE_PROCESS_META_PROPS(Border);
             [view didUpdateHippySubviews];
         }];
     }
-
+    if (_confirmedLayoutDirectionDidUpdated) {
+        HPDirection direction = [self confirmedLayoutDirection];
+        [applierBlocks addObject:^(NSDictionary<NSNumber *, UIView *> *viewRegistry) {
+            UIView *view = viewRegistry[self->_hippyTag];
+            [view applyLayoutDirectionFromParent:direction];
+        }];
+        _confirmedLayoutDirectionDidUpdated = NO;
+    }
     if (!_backgroundColor) {
         UIColor *parentBackgroundColor = parentProperties[HippyBackgroundColorProp];
         if (parentBackgroundColor) {
@@ -241,90 +121,6 @@ DEFINE_PROCESS_META_PROPS(Border);
     }
 }
 
-- (NSDictionary<NSString *, id> *)processUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
-                                      virtualApplierBlocks:(__unused NSMutableSet<HippyApplierVirtualBlock> *)virtualApplierBlocks
-                                          parentProperties:(NSDictionary<NSString *, id> *)parentProperties {
-    // TODO: we always refresh all propagated properties when propagation is
-    // dirtied, but really we should track which properties have changed and
-    // only update those.
-
-    if (_didUpdateSubviews) {
-        _didUpdateSubviews = NO;
-        [self didUpdateHippySubviews];
-        [applierBlocks addObject:^(NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-            UIView *view = viewRegistry[self->_hippyTag];
-            [view clearSortedSubviews];
-            [view didUpdateHippySubviews];
-        }];
-    }
-
-    if (!_backgroundColor) {
-        UIColor *parentBackgroundColor = parentProperties[HippyBackgroundColorProp];
-        if (parentBackgroundColor) {
-            [applierBlocks addObject:^(NSDictionary<NSNumber *, UIView *> *viewRegistry) {
-                UIView *view = viewRegistry[self->_hippyTag];
-                [view hippySetInheritedBackgroundColor:parentBackgroundColor];
-            }];
-        }
-    } else {
-        // Update parent properties for children
-        NSMutableDictionary<NSString *, id> *properties = [NSMutableDictionary dictionaryWithDictionary:parentProperties];
-        CGFloat alpha = CGColorGetAlpha(_backgroundColor.CGColor);
-        if (alpha < 1.0) {
-            // If bg is non-opaque, don't propagate further
-            properties[HippyBackgroundColorProp] = [UIColor clearColor];
-        } else {
-            properties[HippyBackgroundColorProp] = _backgroundColor;
-        }
-        return properties;
-    }
-    return parentProperties;
-}
-
-- (void)collectUpdatedProperties:(NSMutableSet<HippyApplierBlock> *)applierBlocks
-            virtualApplierBlocks:(NSMutableSet<HippyApplierVirtualBlock> *)virtualApplierBlocks
-                parentProperties:(NSDictionary<NSString *, id> *)parentProperties {
-    if (_propagationLifecycle == HippyUpdateLifecycleComputed && [parentProperties isEqualToDictionary:_lastParentProperties]) {
-        return;
-    }
-    _propagationLifecycle = HippyUpdateLifecycleComputed;
-    _lastParentProperties = parentProperties;
-    NSDictionary<NSString *, id> *nextProps = [self processUpdatedProperties:applierBlocks virtualApplierBlocks:virtualApplierBlocks
-                                                            parentProperties:parentProperties];
-    for (HippyShadowView *child in _hippySubviews) {
-        [child collectUpdatedProperties:applierBlocks virtualApplierBlocks:virtualApplierBlocks parentProperties:nextProps];
-    }
-}
-
-- (void)collectUpdatedFrames:(NSMutableSet<HippyShadowView *> *)viewsWithNewFrame
-                   withFrame:(CGRect)frame
-                      hidden:(BOOL)hidden
-            absolutePosition:(CGPoint)absolutePosition {
-    if (_hidden != hidden) {
-        // The hidden state has changed. Even if the frame hasn't changed, add
-        // this ShadowView to viewsWithNewFrame so the UIManager will process
-        // this ShadowView's UIView and update its hidden state.
-        _hidden = hidden;
-        [viewsWithNewFrame addObject:self];
-    }
-
-    if (!CGRectEqualToRect(frame, _frame)) {
-        MTTNodeStyleSetPositionType(_nodeRef, PositionTypeAbsolute);
-        MTTNodeStyleSetWidth(_nodeRef, CGRectGetWidth(frame));
-        MTTNodeStyleSetHeight(_nodeRef, CGRectGetHeight(frame));
-        MTTNodeStyleSetPosition(_nodeRef, CSSLeft, frame.origin.x);
-        MTTNodeStyleSetPosition(_nodeRef, CSSTop, frame.origin.y);
-    }
-
-    //  CSSNodeCalculateLayout(_cssNode, frame.size.width, frame.size.height, CSSDirectionInherit);
-    NSWritingDirection direction = [[HippyI18nUtils sharedInstance] writingDirectionForCurrentAppLanguage];
-    MTTDirection nodeDirection = (NSWritingDirectionRightToLeft == direction) ? DirectionRTL : DirectionLTR;
-    nodeDirection = self.layoutDirection != DirectionInherit ? self.layoutDirection : nodeDirection;
-    MTTNodeDoLayout(_nodeRef, frame.size.width, frame.size.height, nodeDirection);
-    //  [self applyLayoutNode:_cssNode viewsWithNewFrame:viewsWithNewFrame absolutePosition:absolutePosition];
-    [self applyLayoutNode:_nodeRef viewsWithNewFrame:viewsWithNewFrame absolutePosition:absolutePosition];
-}
-
 - (CGRect)measureLayoutRelativeToAncestor:(HippyShadowView *)ancestor {
     CGPoint offset = CGPointZero;
     NSInteger depth = 30;  // max depth to search
@@ -354,30 +150,20 @@ DEFINE_PROCESS_META_PROPS(Border);
 - (instancetype)init {
     if ((self = [super init])) {
         _frame = CGRectMake(0, 0, NAN, NAN);
-
-        for (unsigned int ii = 0; ii < META_PROP_COUNT; ii++) {
-            _paddingMetaProps[ii] = NAN;
-            _marginMetaProps[ii] = NAN;
-            _borderMetaProps[ii] = NAN;
-        }
-
         _newView = YES;
+        _isDecendantOfLazilyShadowView = -1;
         _propagationLifecycle = HippyUpdateLifecycleUninitialized;
         _textLifecycle = HippyUpdateLifecycleUninitialized;
-
+        _hasNewLayout = YES;
         _hippySubviews = [NSMutableArray array];
-
-        _nodeRef = MTTNodeNew();
+        _confirmedLayoutDirection = DirectionInherit;
+        _layoutDirection = DirectionInherit;
     }
     return self;
 }
 
 - (BOOL)isHippyRootView {
     return HippyIsHippyRootView(self.hippyTag);
-}
-
-- (void)dealloc {
-    MTTNodeFree(_nodeRef);
 }
 
 - (BOOL)isCSSLeafNode {
@@ -388,6 +174,17 @@ DEFINE_PROCESS_META_PROPS(Border);
     if (_propagationLifecycle != HippyUpdateLifecycleDirtied) {
         _propagationLifecycle = HippyUpdateLifecycleDirtied;
         [_superview dirtyPropagation];
+    }
+}
+
+- (void)dirtySelfPropagation {
+    _propagationLifecycle = HippyUpdateLifecycleDirtied;
+}
+
+- (void)dirtyDescendantPropagation {
+    [self dirtySelfPropagation];
+    for (HippyShadowView *shadowView in self.hippySubviews) {
+        [shadowView dirtySelfPropagation];
     }
 }
 
@@ -406,19 +203,68 @@ DEFINE_PROCESS_META_PROPS(Border);
     return _textLifecycle != HippyUpdateLifecycleComputed;
 }
 
+- (HippyCreationType)creationType {
+    if (HippyCreationTypeUndetermined == _creationType) {
+        HippyShadowView *superShadowView = [self hippySuperview];
+        if (superShadowView && ![superShadowView isHippyRootView]) {
+            _creationType = [superShadowView creationType];
+        }
+        else {
+            _creationType = HippyCreationTypeInstantly;
+        }
+    }
+    return _creationType;
+}
+
 - (void)setTextComputed {
     _textLifecycle = HippyUpdateLifecycleComputed;
+}
+
+- (void)recusivelySetCreationTypeToInstant {
+    auto domManager = self.domManager.lock();
+    if (domManager) {
+        __weak HippyShadowView *weakSelf = self;
+        std::function<void ()> func = [weakSelf](){
+            if (weakSelf) {
+                HippyShadowView *strongSelf = weakSelf;
+                strongSelf.creationType = HippyCreationTypeInstantly;
+                for (HippyShadowView *subShadowView in strongSelf.hippySubviews) {
+                    [subShadowView synchronousRecusivelySetCreationTypeToInstant];
+                }
+            }
+        };
+        domManager->PostTask(func);
+    }
+}
+
+- (void)synchronousRecusivelySetCreationTypeToInstant {
+    self.creationType = HippyCreationTypeInstantly;
+    for (HippyShadowView *subShadowView in self.hippySubviews) {
+        [subShadowView synchronousRecusivelySetCreationTypeToInstant];
+    }
+}
+
+- (void)setDomManager:(const std::weak_ptr<hippy::DomManager>)domManager {
+    _domManager = domManager;
+}
+
+- (std::weak_ptr<hippy::DomManager>)domManager {
+    return _domManager;
 }
 
 - (BOOL)isHidden {
     return _hidden || [_visibility isEqualToString:@"hidden"];
 }
 
+- (void)setVisibility:(NSString *)visibility {
+    if (![_visibility isEqualToString:visibility]) {
+        _visibility = visibility;
+        _visibilityChanged = YES;
+    }
+}
+
 - (void)insertHippySubview:(HippyShadowView *)subview atIndex:(NSInteger)atIndex {
     [_hippySubviews insertObject:subview atIndex:atIndex];
-    if (![self isCSSLeafNode]) {
-        MTTNodeInsertChild(_nodeRef, subview.nodeRef, (uint32_t)atIndex);
-    }
     subview->_superview = self;
     _didUpdateSubviews = YES;
     [self dirtyText];
@@ -431,9 +277,11 @@ DEFINE_PROCESS_META_PROPS(Border);
     _didUpdateSubviews = YES;
     subview->_superview = nil;
     [_hippySubviews removeObject:subview];
-    if (![self isCSSLeafNode]) {
-        MTTNodeRemoveChild(_nodeRef, subview.nodeRef);
-    }
+}
+
+- (void)removeFromHippySuperview {
+    id superview = [self hippySuperview];
+    [superview removeHippySubview:self];
 }
 
 - (NSArray<HippyShadowView *> *)hippySubviews {
@@ -483,197 +331,49 @@ DEFINE_PROCESS_META_PROPS(Border);
     return description;
 }
 
-// Margin
-
-#define HIPPY_MARGIN_PROPERTY(prop, metaProp)           \
-    -(void)setMargin##prop : (CGFloat)value {           \
-        _marginMetaProps[META_PROP_##metaProp] = value; \
-        _recomputeMargin = YES;                         \
-    }                                                   \
-    -(CGFloat)margin##prop {                            \
-        return _marginMetaProps[META_PROP_##metaProp];  \
-    }
-
-HIPPY_MARGIN_PROPERTY(, ALL)
-HIPPY_MARGIN_PROPERTY(Vertical, VERTICAL)
-HIPPY_MARGIN_PROPERTY(Horizontal, HORIZONTAL)
-HIPPY_MARGIN_PROPERTY(Top, TOP)
-HIPPY_MARGIN_PROPERTY(Left, LEFT)
-HIPPY_MARGIN_PROPERTY(Bottom, BOTTOM)
-HIPPY_MARGIN_PROPERTY(Right, RIGHT)
-
-// Padding
-
-#define HIPPY_PADDING_PROPERTY(prop, metaProp)           \
-    -(void)setPadding##prop : (CGFloat)value {           \
-        _paddingMetaProps[META_PROP_##metaProp] = value; \
-        _recomputePadding = YES;                         \
-    }                                                    \
-    -(CGFloat)padding##prop {                            \
-        return _paddingMetaProps[META_PROP_##metaProp];  \
-    }
-
-HIPPY_PADDING_PROPERTY(, ALL)
-HIPPY_PADDING_PROPERTY(Vertical, VERTICAL)
-HIPPY_PADDING_PROPERTY(Horizontal, HORIZONTAL)
-HIPPY_PADDING_PROPERTY(Top, TOP)
-HIPPY_PADDING_PROPERTY(Left, LEFT)
-HIPPY_PADDING_PROPERTY(Bottom, BOTTOM)
-HIPPY_PADDING_PROPERTY(Right, RIGHT)
-
 - (UIEdgeInsets)paddingAsInsets {
-    CGFloat top = MTTNodeLayoutGetPadding(_nodeRef, CSSTop);
-    if (isnan(top)) {
-        top = 0;
-    }
-    CGFloat left = MTTNodeLayoutGetPadding(_nodeRef, CSSLeft);
-    if (isnan(left)) {
-        left = 0;
-    }
-    CGFloat bottom = MTTNodeLayoutGetPadding(_nodeRef, CSSBottom);
-    if (isnan(bottom)) {
-        bottom = 0;
-    }
-    CGFloat right = MTTNodeLayoutGetPadding(_nodeRef, CSSRight);
-    if (isnan(right)) {
-        right = 0;
-    }
-    return UIEdgeInsetsMake(top, left, bottom, right);
+    UIEdgeInsets insets = UIEdgeInsetsZero;
+    insets = UIEdgeInsetsFromLayoutResult(_nodeLayoutResult);
+    return insets;
 }
-
-// Border
-#define HIPPY_BORDER_PROPERTY(prop, metaProp)           \
-    -(void)setBorder##prop##Width : (CGFloat)value {    \
-        _borderMetaProps[META_PROP_##metaProp] = value; \
-        _recomputeBorder = YES;                         \
-    }                                                   \
-    -(CGFloat)border##prop##Width {                     \
-        return _borderMetaProps[META_PROP_##metaProp];  \
-    }
-
-HIPPY_BORDER_PROPERTY(, ALL)
-HIPPY_BORDER_PROPERTY(Top, TOP)
-HIPPY_BORDER_PROPERTY(Left, LEFT)
-HIPPY_BORDER_PROPERTY(Bottom, BOTTOM)
-HIPPY_BORDER_PROPERTY(Right, RIGHT)
-
-// Dimensions
-#define X5_DIMENSION_PROPERTY(setProp, getProp, cssProp) \
-    -(void)set##setProp : (CGFloat)value {               \
-        MTTNodeStyleSet##cssProp(_nodeRef, value);       \
-        [self dirtyText];                                \
-    }                                                    \
-    -(CGFloat)getProp {                                  \
-        return MTTNodeLayoutGet##cssProp(_nodeRef);      \
-    }
-X5_DIMENSION_PROPERTY(Width, width, Width)
-X5_DIMENSION_PROPERTY(Height, height, Height)
-X5_DIMENSION_PROPERTY(MinWidth, minWidth, MinWidth)
-X5_DIMENSION_PROPERTY(MinHeight, minHeight, MinHeight)
-X5_DIMENSION_PROPERTY(MaxWidth, maxWidth, MaxWidth)
-X5_DIMENSION_PROPERTY(MaxHeight, maxHeight, MaxHeight)
-
-// Position
-#define X5_POSITION_PROPERTY(setProp, getProp, edge)     \
-    -(void)set##setProp : (CGFloat)value {               \
-        MTTNodeStyleSetPosition(_nodeRef, edge, value);  \
-        [self dirtyText];                                \
-    }                                                    \
-    -(CGFloat)getProp {                                  \
-        return MTTNodeLayoutGetPosition(_nodeRef, edge); \
-    }
-X5_POSITION_PROPERTY(Top, top, CSSTop)
-X5_POSITION_PROPERTY(Right, right, CSSRight)
-X5_POSITION_PROPERTY(Bottom, bottom, CSSBottom)
-X5_POSITION_PROPERTY(Left, left, CSSLeft)
 
 - (void)setFrame:(CGRect)frame {
     if (!CGRectEqualToRect(frame, _frame)) {
         _frame = frame;
-        MTTNodeStyleSetPosition(_nodeRef, CSSLeft, CGRectGetMinX(frame));
-        MTTNodeStyleSetPosition(_nodeRef, CSSTop, CGRectGetMinY(frame));
-        MTTNodeStyleSetWidth(_nodeRef, CGRectGetWidth(frame));
-        MTTNodeStyleSetHeight(_nodeRef, CGRectGetHeight(frame));
+        self.hasNewLayout = YES;
     }
 }
 
-static inline void x5AssignSuggestedDimension(MTTNodeRef cssNode, Dimension dimension, CGFloat amount) {
-    if (amount != UIViewNoIntrinsicMetric) {
-        switch (dimension) {
-            case DimWidth:
-                if (isnan(MTTNodeLayoutGetWidth(cssNode))) {
-                    MTTNodeStyleSetWidth(cssNode, amount);
+- (void)setLayoutFrame:(CGRect)frame {
+    auto domManager = self.domManager.lock();
+    if (domManager) {
+        __weak HippyShadowView *weakSelf = self;
+        std::function<void ()> func = [weakSelf, domManager, frame](){
+            @autoreleasepool {
+                if (weakSelf) {
+                    HippyShadowView *strongSelf = weakSelf;
+                    int32_t hippyTag = [[strongSelf hippyTag] intValue];
+                    auto node = domManager->GetNode(hippyTag);
+                    if (node) {
+                        auto layoutNode = node->GetLayoutNode();
+                        layoutNode->SetPosition(hippy::dom::EdgeLeft, frame.origin.x);
+                        layoutNode->SetPosition(hippy::dom::EdgeTop, frame.origin.y);
+                        layoutNode->SetWidth(frame.size.width);
+                        layoutNode->SetHeight(frame.size.height);
+                        layoutNode->MarkDirty();
+                        [strongSelf dirtyPropagation];
+                        strongSelf.hasNewLayout = YES;
+                    }
                 }
-                break;
-            case DimHeight:
-                if (isnan(MTTNodeLayoutGetHeight(cssNode))) {
-                    MTTNodeStyleSetHeight(cssNode, amount);
-                }
-                break;
-        }
+            }
+        };
+        domManager->PostTask(func);
     }
 }
-
-- (void)setIntrinsicContentSize:(CGSize)size {
-    if (MTTNodeLayoutGetFlexGrow(_nodeRef) == 0.f && MTTNodeLayoutGetFlexShrink(_nodeRef) == 0.f) {
-        x5AssignSuggestedDimension(_nodeRef, DimHeight, size.height);
-        x5AssignSuggestedDimension(_nodeRef, DimWidth, size.width);
-    }
-}
-
-- (void)setTopLeft:(CGPoint)topLeft {
-    MTTNodeStyleSetPosition(_nodeRef, CSSLeft, topLeft.x);
-    MTTNodeStyleSetPosition(_nodeRef, CSSLeft, topLeft.y);
-}
-
-- (void)setSize:(CGSize)size {
-    MTTNodeStyleSetWidth(_nodeRef, size.width);
-    MTTNodeStyleSetHeight(_nodeRef, size.height);
-}
-
-- (void)setLayoutDirection:(MTTDirection)layoutDirection {
-    _layoutDirection = layoutDirection;
-    MTTNodeStyleSetDirection(_nodeRef, layoutDirection);
-}
-
-// Flex
-
-- (void)setFlex:(CGFloat)value {
-    MTTNodeStyleSetFlex(_nodeRef, value);
-}
-
-#define X5_STYLE_PROPERTY(setProp, getProp, cssProp, type) \
-    -(void)set##setProp : (type)value {                    \
-        MTTNodeStyleSet##cssProp(_nodeRef, value);         \
-    }                                                      \
-    -(type)getProp {                                       \
-        return MTTNodeLayoutGet##cssProp(_nodeRef);        \
-    }
-
-X5_STYLE_PROPERTY(FlexGrow, flexGrow, FlexGrow, CGFloat)
-X5_STYLE_PROPERTY(FlexShrink, flexShrink, FlexShrink, CGFloat)
-X5_STYLE_PROPERTY(FlexBasis, flexBasis, FlexBasis, CGFloat)
-X5_STYLE_PROPERTY(FlexDirection, flexDirection, FlexDirection, FlexDirection)
-X5_STYLE_PROPERTY(JustifyContent, justifyContent, JustifyContent, FlexAlign)
-X5_STYLE_PROPERTY(AlignSelf, alignSelf, AlignSelf, FlexAlign)
-X5_STYLE_PROPERTY(AlignItems, alignItems, AlignItems, FlexAlign)
-X5_STYLE_PROPERTY(Position, position, PositionType, PositionType)
-X5_STYLE_PROPERTY(FlexWrap, flexWrap, FlexWrap, FlexWrapMode)
-X5_STYLE_PROPERTY(Overflow, overflow, Overflow, OverflowType)
-X5_STYLE_PROPERTY(DisplayType, displayType, Display, DisplayType)
 
 - (void)setBackgroundColor:(UIColor *)color {
     _backgroundColor = color;
     [self dirtyPropagation];
-}
-
-- (void)setZIndex:(NSInteger)zIndex {
-    _zIndex = zIndex;
-    if (_superview) {
-        // Changing zIndex means the subview order of the parent needs updating
-        _superview->_didUpdateSubviews = YES;
-        [_superview dirtyPropagation];
-    }
 }
 
 - (void)didUpdateHippySubviews {
@@ -681,18 +381,6 @@ X5_STYLE_PROPERTY(DisplayType, displayType, Display, DisplayType)
 }
 
 - (void)didSetProps:(__unused NSArray<NSString *> *)changedProps {
-    if (_recomputePadding) {
-        HippyProcessMetaPropsPadding(_paddingMetaProps, _nodeRef);
-    }
-    if (_recomputeMargin) {
-        HippyProcessMetaPropsMargin(_marginMetaProps, _nodeRef);
-    }
-    if (_recomputeBorder) {
-        HippyProcessMetaPropsBorder(_borderMetaProps, _nodeRef);
-    }
-    _recomputeMargin = NO;
-    _recomputePadding = NO;
-    _recomputeBorder = NO;
 }
 
 - (void)hippySetFrame:(__unused CGRect)frame {
@@ -748,4 +436,71 @@ X5_STYLE_PROPERTY(DisplayType, displayType, Display, DisplayType)
     }
     return ret;
 }
+
+- (void)addEventName:(const std::string &)name {
+    _eventNames.push_back(name);
+}
+
+- (const std::vector<std::string> &)allEventNames {
+    return _eventNames;
+}
+
+- (void)clearEventNames {
+    _eventNames.clear();
+}
+
+- (void)setLayoutDirection:(HPDirection)direction {
+    _layoutDirection = direction;
+    self.confirmedLayoutDirection = direction;
+}
+
+- (void)setConfirmedLayoutDirection:(HPDirection)confirmedLayoutDirection {
+    if (_confirmedLayoutDirection != confirmedLayoutDirection) {
+        _confirmedLayoutDirection = confirmedLayoutDirection;
+        _confirmedLayoutDirectionDidUpdated = YES;
+        [self applyConfirmedLayoutDirectionToSubviews:confirmedLayoutDirection];
+    }
+}
+
+- (void)applyConfirmedLayoutDirectionToSubviews:(HPDirection)confirmedLayoutDirection {
+    _confirmedLayoutDirection = confirmedLayoutDirection;
+    for (HippyShadowView *subviews in self.hippySubviews) {
+        [subviews applyConfirmedLayoutDirectionToSubviews:confirmedLayoutDirection];
+    }
+}
+
+- (BOOL)isLayoutSubviewsRTL {
+    BOOL layoutRTL = DirectionRTL == self.confirmedLayoutDirection;
+    return layoutRTL;
+}
+
+- (void)checkLayoutDirection:(NSMutableSet<HippyShadowView *> *)viewsSet direction:(HPDirection *)direction{
+    if (DirectionInherit == self.confirmedLayoutDirection) {
+        [viewsSet addObject:self];
+        HippyShadowView *shadowSuperview = [self hippySuperview];
+        if (!shadowSuperview) {
+            if (direction) {
+                NSWritingDirection writingDirection =
+                    [[HippyI18nUtils sharedInstance] writingDirectionForCurrentAppLanguage];
+                *direction = NSWritingDirectionRightToLeft == writingDirection ? DirectionRTL : DirectionLTR;
+            }
+        }
+        else {
+            [shadowSuperview checkLayoutDirection:viewsSet direction:direction];
+        }
+    }
+    else if (direction) {
+        *direction = self.confirmedLayoutDirection;
+    }
+}
+
+- (void)superviewLayoutDirectionChangedTo:(HPDirection)direction {
+    if (DirectionInherit == self.layoutDirection) {
+        self.confirmedLayoutDirection = [self superview].confirmedLayoutDirection;
+        for (HippyShadowView *subview in self.hippySubviews) {
+            [subview superviewLayoutDirectionChangedTo:self.confirmedLayoutDirection];
+        }
+    }
+}
+
 @end

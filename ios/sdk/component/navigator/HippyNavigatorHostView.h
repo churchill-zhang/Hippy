@@ -28,10 +28,15 @@ NS_ASSUME_NONNULL_BEGIN
 @end
 
 @interface HippyNavigatorHostView : UIView <HippyInvalidating, UINavigationControllerDelegate>
+
 @property (nonatomic, weak) id<NavigatorHostViewDelegate> delegate;
-- (instancetype)initWithBridge:(HippyBridge *)bridge props:(NSDictionary *)props;
+
+- (instancetype)initWithProps:(nonnull NSDictionary *)props;
+
 - (void)push:(NSDictionary *)params;
+
 - (void)pop:(NSDictionary *)params;
+
 @end
 
 NS_ASSUME_NONNULL_END

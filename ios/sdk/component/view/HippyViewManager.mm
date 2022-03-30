@@ -21,7 +21,6 @@
  */
 
 #import "HippyViewManager.h"
-#include "MTTFlex.h"
 #import "HippyBridge.h"
 #import "HippyBorderStyle.h"
 #import "HippyConvert.h"
@@ -32,37 +31,41 @@
 #import "HippyUtils.h"
 #import "HippyView.h"
 #import "UIView+Hippy.h"
-#import "HippyVirtualNode.h"
 #import "HippyConvert+Transform.h"
 #import "HippyGradientObject.h"
+#import "HippyImageDataLoaderProtocol.h"
+#import "HippyRenderContext.h"
+#import "HippyImageDataLoader.h"
+#import "HippyDefaultImageProvider.h"
+#import "objc/runtime.h"
+#import "UIView+DirectionalLayout.h"
+
+@interface HippyViewManager () {
+    id<HippyImageDataLoaderProtocol> _imageDataLoader;
+    NSUInteger _sequence;
+}
+
+@end
 
 @implementation HippyViewManager
-
-@synthesize bridge = _bridge;
-
-HIPPY_EXPORT_MODULE(View)
 
 - (dispatch_queue_t)methodQueue {
     return HippyGetUIManagerQueue();
 }
 
 - (UIView *)view {
-    return [[HippyView alloc] initWithBridge:self.bridge];
+    return [[HippyView alloc] init];
 }
 
 - (HippyShadowView *)shadowView {
     return [HippyShadowView new];
 }
 
-- (HippyVirtualNode *)node:(NSNumber *)tag name:(NSString *)name props:(NSDictionary *)props {
-    return [HippyVirtualNode createNode:tag viewName:name props:props];
-}
-
-- (HippyViewManagerUIBlock)uiBlockToAmendWithShadowView:(__unused HippyShadowView *)shadowView {
+- (HippyRenderUIBlock)uiBlockToAmendWithShadowView:(__unused HippyShadowView *)shadowView {
     return nil;
 }
 
-- (HippyViewManagerUIBlock)uiBlockToAmendWithShadowViewRegistry:(__unused NSDictionary<NSNumber *, HippyShadowView *> *)shadowViewRegistry {
+- (HippyRenderUIBlock)uiBlockToAmendWithShadowViewRegistry:(__unused NSDictionary<NSNumber *, HippyShadowView *> *)shadowViewRegistry {
     return nil;
 }
 
@@ -90,26 +93,56 @@ HIPPY_EXPORT_VIEW_PROPERTY(onDetachedFromWindow, HippyDirectEventBlock)
 
 HIPPY_CUSTOM_VIEW_PROPERTY(backgroundImage, NSString, HippyView) {
     if (json) {
-        NSString *backgroundImage = [HippyConvert NSString:json];
-        if ([backgroundImage hasPrefix:@"http"] ||
-            [backgroundImage hasPrefix:@"data:image/"] ||
-            [backgroundImage hasPrefix:@"hpfile://"]) {
-            view.backgroundImageUrl = backgroundImage;
+        NSString *imagePath = [HippyConvert NSString:json];
+        if ([self.renderContext.frameworkProxy respondsToSelector:@selector(standardizeAssetUrlString:)]) {
+            imagePath = [self.renderContext.frameworkProxy standardizeAssetUrlString:imagePath];
         }
-        else {
-            HippyAssert(NO, @"backgroundImage %@ not supported", backgroundImage);
+        id<HippyImageDataLoaderProtocol> imageDataLoader = [self imageDataLoader];
+        __weak HippyView *weakView = view;
+        CGFloat scale = [UIScreen mainScreen].scale;
+        NSURL *url = HippyURLWithString(imagePath, nil);
+        NSUInteger sequence = _sequence++;
+        [imageDataLoader loadImageAtUrl:url sequence:sequence progress:^(NSUInteger current, NSUInteger total) {
+        } completion:^(NSUInteger seq, id result, NSURL *url, NSError *error) {
+            if (!error && sequence == seq) {
+                UIImage *backgroundImage = nil;
+                if ([result isKindOfClass:[UIImage class]]) {
+                    backgroundImage = result;
+                }
+                else if ([result isKindOfClass:[NSData class]]) {
+                    HippyDefaultImageProvider *imageProvider = [[HippyDefaultImageProvider alloc] init];
+                    imageProvider.imageDataPath = imagePath;
+                    [imageProvider setImageData:(NSData *)result];
+                    imageProvider.scale = scale;
+                    backgroundImage = [imageProvider image];
+                }
+                dispatch_async(dispatch_get_main_queue(), ^{
+                    if (weakView) {
+                        HippyView *strongView = weakView;
+                        strongView.backgroundImage = backgroundImage;
+                    }
+                });
+            }
+        }];
+    }
+}
+
+- (id<HippyImageDataLoaderProtocol>)imageDataLoader {
+    if (!_imageDataLoader) {
+        if ([self.renderContext.frameworkProxy respondsToSelector:@selector(imageDataLoader)]) {
+            _imageDataLoader = [self.renderContext.frameworkProxy imageDataLoader];
+        }
+        if (!_imageDataLoader) {
+            _imageDataLoader = [[HippyImageDataLoader alloc] init];
         }
     }
+    return _imageDataLoader;
 }
 
 HIPPY_CUSTOM_VIEW_PROPERTY(linearGradient, NSDictionary, HippyView) {
     if (json) {
-        NSMutableDictionary *object = [NSMutableDictionary dictionaryWithObject:self.bridge.moduleName forKey:@"moduleName"];
         NSDictionary *linearGradientObject = [HippyConvert NSDictionary:json];
-        if (linearGradientObject) {
-            [object addEntriesFromDictionary:linearGradientObject];
-        }
-        view.gradientObject = [[HippyGradientObject alloc] initWithGradientObject:object];
+        view.gradientObject = [[HippyGradientObject alloc] initWithGradientObject:linearGradientObject];
         [view.layer setNeedsDisplay];
     }
 }
@@ -335,10 +368,27 @@ HIPPY_EXPORT_VIEW_PROPERTY(onTouchCancel, HippyDirectEventBlock)
 
 HIPPY_EXPORT_SHADOW_PROPERTY(zIndex, NSInteger)
 
-HIPPY_CUSTOM_VIEW_PROPERTY(direction, MTTDirection, HippyShadowView) {
+- (HPDirection)convertDirection:(NSString *)direction {
+    if ([direction isEqualToString:@"rtl"]) {
+        return DirectionRTL;
+    }
+    else if ([direction isEqualToString:@"ltr"]) {
+        return DirectionLTR;
+    }
+    else {
+        return DirectionInherit;
+    }
+}
+
+//HIPPY_CUSTOM_VIEW_PROPERTY(direction, id, UIView) {
+//    if (json) {
+//        view.layoutDirection = [self convertDirection:json];
+//    }
+//}
+
+HIPPY_CUSTOM_SHADOW_PROPERTY(direction, id, HippyShadowView) {
     if (json) {
-        MTTDirection dir = (MTTDirection)[HippyConvert int:json];
-        view.layoutDirection = dir;
+        view.layoutDirection = [self convertDirection:json];
     }
 }
 
@@ -361,4 +411,22 @@ static const char *init_props_identifier = "init_props_identifier";
 
     objc_setAssociatedObject(self, init_props_identifier, props, OBJC_ASSOCIATION_RETAIN);
 }
+@end
+
+@implementation UIView(ViewManager)
+
+- (void)setViewManager:(HippyViewManager *)viewManager {
+    NSHashTable<HippyViewManager *> *weakContainer = nil;
+    if (viewManager) {
+        weakContainer = [NSHashTable weakObjectsHashTable];
+        [weakContainer addObject:viewManager];
+    }
+    objc_setAssociatedObject(self, @selector(viewManager), weakContainer, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (HippyViewManager *)viewManager {
+    NSHashTable<HippyViewManager *> *weakContainer = objc_getAssociatedObject(self, _cmd);
+    return [weakContainer anyObject];
+}
+
 @end

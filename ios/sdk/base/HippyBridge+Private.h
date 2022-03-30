@@ -21,16 +21,16 @@
  */
 
 #import "HippyBridge.h"
-#import "HippyJavaScriptExecutor.h"
-
+#import "HippyJSCExecutor.h"
 @class HippyModuleData;
-@protocol HippyJavaScriptExecutor;
 
 HIPPY_EXTERN NSArray<Class> *HippyGetModuleClasses(void);
 
 #if HIPPY_DEBUG
 HIPPY_EXTERN void HippyVerifyAllModulesExported(NSArray *extraModules);
 #endif
+
+@class HippyOCTurboModule;
 
 @interface HippyBridge ()
 
@@ -82,7 +82,7 @@ HIPPY_EXTERN void HippyVerifyAllModulesExported(NSArray *extraModules);
  * when the executor has been invalidated, or when you want to schedule calls on the
  * JS VM outside of Hippy Native. Use with care!
  */
-@property (nonatomic, weak, readonly) id<HippyJavaScriptExecutor> javaScriptExecutor;
+@property (nonatomic, weak, readonly) HippyJSCExecutor *javaScriptExecutor;
 
 /**
  * Used by HippyModuleData
@@ -125,6 +125,8 @@ HIPPY_EXTERN void HippyVerifyAllModulesExported(NSArray *extraModules);
  */
 - (id)callNativeModule:(NSUInteger)moduleID method:(NSUInteger)methodID params:(NSArray *)params;
 
+- (id)callNativeModuleName:(NSString *)moduleName methodName:(NSString *)methodName params:(NSArray *)params;
+
 /**
  * Exposed for the HippyJSCExecutor for lazily loading native modules
  */
@@ -135,12 +137,17 @@ HIPPY_EXTERN void HippyVerifyAllModulesExported(NSArray *extraModules);
  */
 - (void)_immediatelyCallTimer:(NSNumber *)timer;
 
+/**
+ * Get  the turbo module for a given name.
+ */
+- (HippyOCTurboModule *)turboModuleWithName:(NSString *)name;
+
 @end
 
 @interface HippyBatchedBridge : HippyBridge <HippyInvalidating>
 
 @property (nonatomic, weak, readonly) HippyBridge *parentBridge;
-@property (nonatomic, weak, readonly) id<HippyJavaScriptExecutor> javaScriptExecutor;
+@property (nonatomic, weak, readonly) HippyJSCExecutor *javaScriptExecutor;
 @property (nonatomic, assign, readonly) BOOL moduleSetupComplete;
 
 @property (nonatomic, strong) dispatch_semaphore_t semaphore;

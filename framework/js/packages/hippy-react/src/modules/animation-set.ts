@@ -1,0 +1,228 @@
+/*
+ * Tencent is pleased to support the open source community by making
+ * Hippy available.
+ *
+ * Copyright (C) 2017-2019 THL A29 Limited, a Tencent company.
+ * All rights reserved.
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *   http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+import { HippyEventEmitter, HippyEventRevoker } from '../event';
+import { Bridge } from '../native';
+import { warn } from '../utils';
+import { repeatCountDict } from '../utils/animation';
+import { Animation, AnimationCallback } from './animation';
+import '../global';
+
+interface AnimationInstance {
+  animationId: number;
+  follow: boolean;
+}
+
+interface AnimationChild {
+  animation: Animation;
+  follow: boolean;
+}
+
+interface AnimationSetOption {
+  children: AnimationChild[];
+  repeatCount: number;
+  virtual: any; // TODO: What's it?
+}
+
+interface AnimationSet extends Animation {
+  animationId: number;
+  animationList: AnimationInstance[];
+
+  // Fallback event handlers
+  onRNfqbAnimationStart?: Function;
+  onRNfqbAnimationEnd?: Function;
+  onRNfqbAnimationCancel?: Function;
+  onRNfqbAnimationRepeat?: Function;
+  onHippyAnimationStart?: Function;
+  onHippyAnimationEnd?: Function;
+  onHippyAnimationCancel?: Function;
+  onHippyAnimationRepeat?: Function;
+}
+
+const AnimationEventEmitter = new HippyEventEmitter();
+
+/**
+ * Better performance of Animation series solution.
+ *
+ * It pushes the animation scheme to native at once.
+ */
+class AnimationSet implements AnimationSet {
+  public constructor(config: AnimationSetOption) {
+    this.animationList = [];
+    config.children.forEach((item) => {
+      this.animationList.push({
+        animationId: item.animation.animationId,
+        follow: item.follow || false,
+      });
+    });
+
+    this.animationId = Bridge.callNativeWithCallbackId('AnimationModule', 'createAnimationSet', true, {
+      repeatCount: repeatCountDict(config.repeatCount || 0),
+      children: this.animationList,
+      virtual: config.virtual,
+    });
+
+    // TODO: Deprecated compatible, will remove soon.
+    this.onRNfqbAnimationStart = this.onAnimationStart.bind(this);
+    this.onRNfqbAnimationEnd = this.onAnimationEnd.bind(this);
+    this.onRNfqbAnimationCancel = this.onAnimationCancel.bind(this);
+    this.onRNfqbAnimationRepeat = this.onAnimationRepeat.bind(this);
+    this.onHippyAnimationStart = this.onAnimationStart.bind(this);
+    this.onHippyAnimationEnd = this.onAnimationEnd.bind(this);
+    this.onHippyAnimationCancel = this.onAnimationCancel.bind(this);
+    this.onHippyAnimationRepeat = this.onAnimationRepeat.bind(this);
+  }
+
+  /**
+   * Remove all of animation event listener
+   */
+  public removeEventListener() {
+    if (this.animationStartListener) {
+      this.animationStartListener.remove();
+    }
+    if (this.animationEndListener) {
+      this.animationEndListener.remove();
+    }
+    if (this.animationCancelListener) {
+      this.animationCancelListener.remove();
+    }
+    if (this.animationRepeatListener) {
+      this.animationRepeatListener.remove();
+    }
+  }
+
+  /**
+   * Start animation execution
+   */
+  public start() {
+    this.removeEventListener();
+
+    // Set as iOS default
+    const animationEventName = 'onAnimation';
+
+    if (typeof this.onAnimationStartCallback === 'function') {
+      this.animationStartListener = AnimationEventEmitter.addListener(`${animationEventName}Start`, (animationId) => {
+        if (animationId === this.animationId) {
+          (this.animationStartListener as HippyEventRevoker).remove();
+          if (typeof this.onAnimationStartCallback === 'function') {
+            this.onAnimationStartCallback();
+          }
+        }
+      });
+    }
+    if (typeof this.onAnimationEndCallback === 'function') {
+      this.animationEndListener = AnimationEventEmitter.addListener(`${animationEventName}End`, (animationId) => {
+        if (animationId === this.animationId) {
+          (this.animationEndListener as HippyEventRevoker).remove();
+          if (typeof this.onAnimationEndCallback === 'function') {
+            this.onAnimationEndCallback();
+          }
+        }
+      });
+    }
+    if (typeof this.onAnimationCancelCallback === 'function') {
+      this.animationCancelListener = AnimationEventEmitter.addListener(`${animationEventName}Cancel`, (animationId) => {
+        if (animationId === this.animationId) {
+          (this.animationCancelListener as HippyEventRevoker).remove();
+          if (typeof this.onAnimationCancelCallback === 'function') {
+            this.onAnimationCancelCallback();
+          }
+        }
+      });
+    }
+    if (typeof this.onAnimationRepeatCallback === 'function') {
+      this.animationRepeatListener = AnimationEventEmitter.addListener(`${animationEventName}Repeat`, (animationId) => {
+        if (animationId === this.animationId) {
+          if (typeof this.onAnimationRepeatCallback === 'function') {
+            this.onAnimationRepeatCallback();
+          }
+        }
+      });
+    }
+
+    Bridge.callNative('AnimationModule', 'startAnimation', this.animationId);
+  }
+
+  /**
+   * Use destroy() to destroy animation.
+   */
+  public destory() {
+    warn('AnimationSet.destory() method will be deprecated soon, please use Animation.destroy() as soon as possible');
+    this.destroy();
+  }
+
+  /**
+   * Destroy the animation
+   */
+  public destroy() {
+    this.removeEventListener();
+    this.animationList.forEach(item => Number.isInteger(item.animationId)
+        && Bridge.callNative('AnimationModule', 'destroyAnimation', item.animationId));
+    Bridge.callNative('AnimationModule', 'destroyAnimation', this.animationId);
+  }
+
+  /**
+   * Pause the running animation
+   */
+  public pause() {
+    Bridge.callNative('AnimationModule', 'pauseAnimation', this.animationId);
+  }
+
+  /**
+   * Resume execution of paused animation
+   */
+  public resume() {
+    Bridge.callNative('AnimationModule', 'resumeAnimation', this.animationId);
+  }
+
+  /**
+   * Call when animation started.
+   * @param {Function} cb - callback when animation started.
+   */
+  public onAnimationStart(cb: AnimationCallback) {
+    this.onAnimationStartCallback = cb;
+  }
+
+  /**
+   * Call when animation is ended.
+   * @param {Function} cb - callback when animation started.
+   */
+  public onAnimationEnd(cb: AnimationCallback) {
+    this.onAnimationEndCallback = cb;
+  }
+
+  /**
+   * Call when animation is canceled.
+   * @param {Function} cb - callback when animation started.
+   */
+  public onAnimationCancel(cb: AnimationCallback) {
+    this.onAnimationCancelCallback = cb;
+  }
+
+  /**
+   * Call when animation is repeated.
+   * @param {Function} cb - callback when animation started.
+   */
+  public onAnimationRepeat(cb: AnimationCallback) {
+    this.onAnimationRepeatCallback = cb;
+  }
+}
+
+export default AnimationSet;

@@ -27,25 +27,18 @@
 #import "HippyDefines.h"
 #import "HippyEventDispatcher.h"
 #import "HippyLog.h"
-#import "UIView+Hippy.h"
 #import "HippyBundleURLProvider.h"
+#import "HippyRenderContext.h"
 
 @class HippyBridge;
 @class HippyShadowView;
 @class HippyUIManager;
 
-typedef void (^HippyViewManagerUIBlock)(HippyUIManager *uiManager, NSDictionary<NSNumber *, __kindof UIView *> *viewRegistry);
-
 typedef UIView * (^CreateHippyViewWithPropsBlock)(HippyBridge *bridge, NSString *classname, NSDictionary *props);
 
-@interface HippyViewManager : NSObject <HippyBridgeModule>
+@interface HippyViewManager : NSObject
 
-/**
- * The bridge can be used to access both the HippyUIIManager and the HippyEventDispatcher,
- * allowing the manager (or the views that it manages) to manipulate the view
- * hierarchy and send events back to the JS context.
- */
-@property (nonatomic, weak) HippyBridge *bridge;
+@property(nonatomic, weak)id<HippyRenderContext> renderContext;
 
 /**
  * This method instantiates a native view to be managed by the module. Override
@@ -64,13 +57,11 @@ typedef UIView * (^CreateHippyViewWithPropsBlock)(HippyBridge *bridge, NSString 
  */
 - (HippyShadowView *)shadowView;
 
-- (HippyVirtualNode *)node:(NSNumber *)tag name:(NSString *)name props:(NSDictionary *)props;
-
 /**
  * Called to notify manager that layout has finished, in case any calculated
  * properties need to be copied over from shadow view to view.
  */
-- (HippyViewManagerUIBlock)uiBlockToAmendWithShadowView:(HippyShadowView *)shadowView;
+- (HippyRenderUIBlock)uiBlockToAmendWithShadowView:(HippyShadowView *)shadowView;
 
 /**
  * Called after view hierarchy manipulation has finished, and all shadow props
@@ -78,7 +69,7 @@ typedef UIView * (^CreateHippyViewWithPropsBlock)(HippyBridge *bridge, NSString 
  * custom layout logic or tasks that involve walking the view hierarchy.
  * To be deprecated, hopefully.
  */
-- (HippyViewManagerUIBlock)uiBlockToAmendWithShadowViewRegistry:(NSDictionary<NSNumber *, HippyShadowView *> *)shadowViewRegistry;
+- (HippyRenderUIBlock)uiBlockToAmendWithShadowViewRegistry:(NSDictionary<NSNumber *, HippyShadowView *> *)shadowViewRegistry;
 
 /**
  * This handles the simple case, where JS and native property names match.
@@ -132,6 +123,12 @@ typedef UIView * (^CreateHippyViewWithPropsBlock)(HippyBridge *bridge, NSString 
 
 @end
 
-@interface HippyViewManager (Props)
+@interface HippyViewManager (InitProps)
 @property (nonatomic, strong) NSDictionary *props;
+@end
+
+@interface UIView(ViewManager)
+
+@property(nonatomic, weak)HippyViewManager *viewManager;
+
 @end

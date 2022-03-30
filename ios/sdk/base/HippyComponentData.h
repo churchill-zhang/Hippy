@@ -21,12 +21,10 @@
  */
 
 #import <Foundation/Foundation.h>
-
 #import "HippyComponent.h"
 #import "HippyDefines.h"
 #import "HippyViewManager.h"
-#import "HippyVirtualNode.h"
-@class HippyBridge;
+
 @class HippyShadowView;
 @class UIView;
 
@@ -36,7 +34,7 @@
 @property (nonatomic, copy, readonly) NSString *name;
 @property (nonatomic, weak, readonly) HippyViewManager *manager;
 
-- (instancetype)initWithManagerClass:(Class)managerClass bridge:(HippyBridge *)bridge NS_DESIGNATED_INITIALIZER;
+- (instancetype)initWithViewManager:(HippyViewManager *)viewManager viewName:(NSString *)viewName NS_DESIGNATED_INITIALIZER;
 
 - (UIView *)createViewWithTag:(NSNumber *)tag;
 
@@ -46,10 +44,10 @@
 - (void)setProps:(NSDictionary<NSString *, id> *)props forView:(id<HippyComponent>)view;
 - (void)setProps:(NSDictionary<NSString *, id> *)props forShadowView:(HippyShadowView *)shadowView;
 
-- (NSDictionary<NSString *, id> *)viewConfig;
+- (NSDictionary<NSString *, NSString *> *)eventNameMap;
 
-- (HippyViewManagerUIBlock)uiBlockToAmendWithShadowViewRegistry:(NSDictionary<NSNumber *, HippyShadowView *> *)registry;
+- (NSDictionary<NSString *, id<HippyBridgeMethod>> *)methodsByName;
 
-- (HippyVirtualNode *)createVirtualNode:(NSNumber *)tag props:(NSDictionary *)props;
+- (HippyRenderUIBlock)uiBlockToAmendWithShadowViewRegistry:(NSDictionary<NSNumber *, HippyShadowView *> *)registry;
 
 @end

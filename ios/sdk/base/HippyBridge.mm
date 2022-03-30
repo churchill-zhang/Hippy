@@ -35,6 +35,9 @@
 #import "HippyUIManager.h"
 #import "HippyExtAnimationModule.h"
 #import "HippyRedBox.h"
+#import "HippyTurboModule.h"
+#import "HippyBridge+LocalFileSource.h"
+#import "HippyBridge+Private.h"
 
 NSString *const HippyReloadNotification = @"HippyReloadNotification";
 NSString *const HippyJavaScriptWillStartLoadingNotification = @"HippyJavaScriptWillStartLoadingNotification";
@@ -42,7 +45,7 @@ NSString *const HippyJavaScriptDidLoadNotification = @"HippyJavaScriptDidLoadNot
 NSString *const HippyJavaScriptDidFailToLoadNotification = @"HippyJavaScriptDidFailToLoadNotification";
 NSString *const HippyDidInitializeModuleNotification = @"HippyDidInitializeModuleNotification";
 NSString *const HippyBusinessDidLoadNotification = @"HippyBusinessDidLoadNotification";
-NSString *const _HippySDKVersion = @"2.2.0";
+NSString *const HippySDKVersion = @"2.2.0";
 
 static NSMutableArray<Class> *HippyModuleClasses;
 NSArray<Class> *HippyGetModuleClasses(void) {
@@ -72,10 +75,16 @@ void HippyRegisterModule(Class moduleClass) {
  */
 NSString *HippyBridgeModuleNameForClass(Class cls) {
 #if HIPPY_DEBUG
-    HippyAssert([cls conformsToProtocol:@protocol(HippyBridgeModule)], @"Bridge module `%@` does not conform to HippyBridgeModule", cls);
+    HippyAssert([cls conformsToProtocol:@protocol(HippyBridgeModule)] || [cls conformsToProtocol:@protocol(HippyTurboModule)],
+                @"Bridge module `%@` does not conform to HippyBridgeModule or HippyTurboModule", cls);
 #endif
-
-    NSString *name = [cls moduleName];
+    NSString *name = nil;
+    // The two protocols(HippyBridgeModule and HippyTurboModule)  should be mutually exclusive.
+    if ([cls conformsToProtocol:@protocol(HippyBridgeModule)]) {
+        name = [cls moduleName];
+    } else if ([cls conformsToProtocol:@protocol(HippyTurboModule)]) {
+        name = [cls turoboModuleName];
+    }
     if (name.length == 0) {
         name = NSStringFromClass(cls);
     }
@@ -132,13 +141,14 @@ void HippyVerifyAllModulesExported(NSArray *extraModules) {
 }
 #endif
 
-@implementation HippyBridge {
+@interface HippyBridge() {
     NSURL *_delegateBundleURL;
-    id<HippyImageViewCustomLoader> _imageLoader;
-    id<HippyCustomTouchHandlerProtocol> _customTouchHandler;
     NSSet<Class<HippyImageProviderProtocol>> *_imageProviders;
     BOOL _isInitImageLoader;
 }
+@end
+
+@implementation HippyBridge
 
 dispatch_queue_t HippyJSThread;
 
@@ -186,9 +196,10 @@ static HippyBridge *HippyCurrentBridgeInstance = nil;
         _bundleURL = bundleURL;
         _moduleProvider = block;
         _debugMode = [launchOptions[@"DebugMode"] boolValue];
-        _shareOptions = [NSMutableDictionary new];
+        _enableTurbo = !!launchOptions[@"EnableTurbo"] ? [launchOptions[@"EnableTurbo"] boolValue] : YES;
         _appVerson = @"";
         _executorKey = executorKey;
+        _invalidateReason = HippyInvalidateReasonDealloc;
         [self setUp];
 
         HippyExecuteOnMainQueue(^{
@@ -196,6 +207,18 @@ static HippyBridge *HippyCurrentBridgeInstance = nil;
         });
         HippyLogInfo(@"[Hippy_OC_Log][Life_Circle],%@ Init %p", NSStringFromClass([self class]), self);
     }
+    return self;
+}
+
+- (instancetype)initWithmoduleProviderWithoutRuntime:(HippyBridgeModuleProviderBlock)block {
+    self = [super init];
+    if (self) {
+        _moduleProvider = block;
+        [self setUp];
+    }
+    HippyExecuteOnMainQueue(^{
+        [self bindKeys];
+    });
     return self;
 }
 
@@ -208,6 +231,8 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
      */
     HippyLogInfo(@"[Hippy_OC_Log][Life_Circle],%@ dealloc %p", NSStringFromClass([self class]), self);
     [[NSNotificationCenter defaultCenter] removeObserver:self];
+    self.invalidateReason = HippyInvalidateReasonDealloc;
+    self.batchedBridge.invalidateReason = HippyInvalidateReasonDealloc;
     [self invalidate];
 }
 
@@ -218,7 +243,7 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
     HippyKeyCommands *commands = [HippyKeyCommands sharedInstance];
 
     // reload in current mode
-    __weak typeof(self) weakSelf = self;
+    __weak __typeof(self) weakSelf = self;
     [commands registerKeyCommandWithInput:@"r" modifierFlags:UIKeyModifierCommand action:^(__unused UIKeyCommand *command) {
         // 暂时屏蔽掉RN的调试
         [weakSelf requestReload];
@@ -245,24 +270,6 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
     return [self moduleForName:@"AnimationModule"];
 }
 
-- (id<HippyImageViewCustomLoader>)imageLoader {
-    if (!_isInitImageLoader) {
-        _imageLoader = [[self modulesConformingToProtocol:@protocol(HippyImageViewCustomLoader)] lastObject];
-
-        if (_imageLoader) {
-            _isInitImageLoader = YES;
-        }
-    }
-    return _imageLoader;
-}
-
-- (id<HippyCustomTouchHandlerProtocol>)customTouchHandler {
-    if (!_customTouchHandler) {
-        _customTouchHandler = [[self modulesConformingToProtocol:@protocol(HippyCustomTouchHandlerProtocol)] lastObject];
-    }
-    return _customTouchHandler;
-}
-
 - (NSSet<Class<HippyImageProviderProtocol>> *)imageProviders {
     if (!_imageProviders) {
         NSMutableSet *set = [NSMutableSet setWithCapacity:8];
@@ -274,6 +281,10 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
         _imageProviders = [NSSet setWithSet:set];
     }
     return _imageProviders;
+}
+
+- (id<HippyFrameworkProxy>)frameworkProxy {
+    return _frameworkProxy ?: self;
 }
 
 - (NSArray *)modulesConformingToProtocol:(Protocol *)protocol {
@@ -302,6 +313,8 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
      * Any thread
      */
     dispatch_async(dispatch_get_main_queue(), ^{
+        self.invalidateReason = HippyInvalidateReasonReload;
+        self.batchedBridge.invalidateReason = HippyInvalidateReasonReload;
         [self invalidate];
         [self setUp];
     });
@@ -331,16 +344,17 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
 
     // Sanitize the bundle URL
     _bundleURL = [HippyConvert NSURL:_bundleURL.absoluteString];
-#ifndef HIPPY_DEBUG
     @try {
-#endif
         [self createBatchedBridge];
         [self.batchedBridge start];
-#ifndef HIPPY_DEBUG
     } @catch (NSException *exception) {
         MttHippyException(exception);
     }
-#endif
+    self.uiManager.frameworkProxy = self;
+}
+
+- (void)setUpDevClientWithName:(NSString *)name {
+    [self.batchedBridge setUpDevClientWithName:name];
 }
 
 - (void)createBatchedBridge {
@@ -401,24 +415,221 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
 #endif  // HIPPY_DEBUG
 }
 
+#pragma mark HippyFrameworkProxy Delegate Implementation
+- (NSString *)standardizeAssetUrlString:(NSString *)UrlString {
+    if ([HippyBridge isHippyLocalFileURLString:UrlString]) {
+        return [self absoluteStringFromHippyLocalFileURLString:UrlString];
+    }
+    return UrlString;
+}
+
 @end
 
-@implementation UIView(Bridge)
+NSString *const HippySecondaryBundleDidStartLoadNotification = @"HippySecondaryBundleDidStartLoadNotification";
+NSString *const HippySecondaryBundleDidLoadSourceCodeNotification = @"HippySecondaryBundleDidLoadSourceCodeNotification";
+NSString *const HippySecondaryBundleDidLoadNotification = @"HippySecondaryBundleDidLoadNotification";
 
-#define kBridgeKey @"bridgeKey"
+@interface SecondaryBundle : NSObject
 
-- (void)setBridge:(HippyBridge *)bridge {
-    if (bridge) {
-        NSMapTable *mapTable = [NSMapTable strongToWeakObjectsMapTable];
-        [mapTable setObject:bridge forKey:kBridgeKey];
-        objc_setAssociatedObject(self, @selector(bridge), mapTable, OBJC_ASSOCIATION_RETAIN);
+@property (nonatomic, strong) NSURL *url;
+@property (nonatomic, copy) SecondaryBundleLoadingCompletion loadBundleCompletion;
+@property (nonatomic, copy) SecondaryBundleLoadingCompletion enqueueScriptCompletion;
+@property (nonatomic, copy) SecondaryBundleCompletion completion;
+
+@end
+
+@implementation SecondaryBundle
+
+@end
+
+static const void *HippyBridgeIsSecondaryBundleLoadingKey = &HippyBridgeIsSecondaryBundleLoadingKey;
+static const void *HippyBridgePendingLoadBundlesKey = &HippyBridgePendingLoadBundlesKey;
+static const void *HippyBridgeLoadedBundlesKey = &HippyBridgeLoadedBundlesKey;
+
+@implementation HippyBridge (Mtt)
+
+- (NSMutableArray *)pendingLoadBundles {
+    id value = objc_getAssociatedObject(self, HippyBridgePendingLoadBundlesKey);
+    return value;
+}
+
+- (void)setPendingLoadBundles:(NSMutableArray *)pendingLoadBundles {
+    objc_setAssociatedObject(self, HippyBridgePendingLoadBundlesKey, pendingLoadBundles, OBJC_ASSOCIATION_RETAIN);
+}
+
+- (NSMutableDictionary *)loadedBundleURLs {
+    id value = objc_getAssociatedObject(self, HippyBridgeLoadedBundlesKey);
+    return value;
+}
+
+- (void)setLoadedBundleURLs:(NSMutableDictionary *)loadedBundleURLs {
+    objc_setAssociatedObject(self, HippyBridgeLoadedBundlesKey, loadedBundleURLs, OBJC_ASSOCIATION_RETAIN);
+}
+
+- (BOOL)isSecondaryBundleLoading {
+    return [(NSNumber *)objc_getAssociatedObject(self, &HippyBridgeIsSecondaryBundleLoadingKey) boolValue];
+}
+
+- (void)setIsSecondaryBundleLoading:(BOOL)isSecondaryBundleLoading {
+    objc_setAssociatedObject(self, &HippyBridgeIsSecondaryBundleLoadingKey, @(isSecondaryBundleLoading), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (void)loadSecondary:(NSURL *)secondaryBundleURL
+       loadBundleCompletion:(SecondaryBundleLoadingCompletion)loadBundleCompletion
+    enqueueScriptCompletion:(SecondaryBundleLoadingCompletion)enqueueScriptCompletion
+                 completion:(SecondaryBundleCompletion)completion {
+    if (secondaryBundleURL.absoluteString.length == 0) {
+        return;
+    }
+    __weak HippyBatchedBridge *batchedBridge = (HippyBatchedBridge *)[self batchedBridge];
+    NSString *secondaryBundleURLString = [secondaryBundleURL path];
+    batchedBridge.sandboxDirectory = [secondaryBundleURLString stringByDeletingLastPathComponent];
+    BOOL loaded;
+    @synchronized(self) {
+        loaded = [self.loadedBundleURLs objectForKey:secondaryBundleURLString] != nil;
+    }
+    // 已经加载，直接返回
+    if (loaded) {
+        if (completion) {
+            if ([self.batchedBridge.javaScriptExecutor respondsToSelector:@selector(secondBundleLoadCompleted:)]) {
+                [self.batchedBridge.javaScriptExecutor secondBundleLoadCompleted:YES];
+            }
+            completion(YES);
+        }
+
+        [self loadNextBundle];
+
+        return;
+    }
+
+    // 正在加载中，丢进队列
+    if (batchedBridge.isSecondaryBundleLoading) {
+        SecondaryBundle *bundle = [[SecondaryBundle alloc] init];
+        bundle.url = secondaryBundleURL;
+        bundle.loadBundleCompletion = loadBundleCompletion;
+        bundle.enqueueScriptCompletion = enqueueScriptCompletion;
+        bundle.completion = completion;
+
+        if (!self.pendingLoadBundles) {
+            self.pendingLoadBundles = [[NSMutableArray alloc] init];
+        }
+
+        @synchronized(self) {
+            [self.pendingLoadBundles addObject:bundle];
+        }
+    } else {
+        [self.performanceLogger markStartForTag:HippySecondaryStartup];
+
+        batchedBridge.isSecondaryBundleLoading = YES;
+
+        [[NSNotificationCenter defaultCenter] postNotificationName:HippySecondaryBundleDidStartLoadNotification object:self
+                                                          userInfo:@{ @"url": secondaryBundleURLString }];
+
+        dispatch_queue_t bridgeQueue = dispatch_queue_create("mtt.bussiness.HippyBridgeQueue", DISPATCH_QUEUE_CONCURRENT);
+        dispatch_group_t initModulesAndLoadSource = dispatch_group_create();
+        dispatch_group_enter(initModulesAndLoadSource);
+        __block NSData *sourceCode = nil;
+        [self.performanceLogger markStartForTag:HippySecondaryLoadSource];
+        [HippyJavaScriptLoader loadBundleAtURL:secondaryBundleURL onProgress:nil
+                                    onComplete:^(NSError *error, NSData *source, __unused int64_t sourceLength) {
+                                        if (!error) {
+                                            sourceCode = source;
+                                        } else {
+                                            batchedBridge.isSecondaryBundleLoading = NO;
+                                        }
+
+                                        NSMutableDictionary *userInfo =
+                                            [[NSMutableDictionary alloc] initWithDictionary:@ { @"url": secondaryBundleURLString, @"bridge": self }];
+                                        if (error) {
+                                            [userInfo setObject:error forKey:@"error"];
+                                        }
+
+                                        [[NSNotificationCenter defaultCenter] postNotificationName:HippySecondaryBundleDidLoadSourceCodeNotification
+                                                                                            object:self
+                                                                                          userInfo:userInfo];
+
+                                        if (loadBundleCompletion) {
+                                            loadBundleCompletion(error);
+                                        }
+
+                                        [self.performanceLogger markStopForTag:HippySecondaryLoadSource];
+                                        dispatch_group_leave(initModulesAndLoadSource);
+                                    }];
+
+        dispatch_group_notify(initModulesAndLoadSource, bridgeQueue, ^{
+            HippyBatchedBridge *strongBridge = batchedBridge;
+            if (sourceCode) {
+                // 公共包正在加载，等待
+                dispatch_semaphore_wait(strongBridge.semaphore, DISPATCH_TIME_FOREVER);
+
+                dispatch_semaphore_signal(strongBridge.semaphore);
+
+                HippyAssert(!strongBridge.isLoading, @"error, common bundle loaded unfinished");
+                
+                if ([self.batchedBridge.javaScriptExecutor respondsToSelector:@selector(updateGlobalObjectBeforeExcuteSecondary)]) {
+                    [self.batchedBridge.javaScriptExecutor updateGlobalObjectBeforeExcuteSecondary];
+                }
+                [self.performanceLogger markStartForTag:HippySecondaryExecuteSource];
+                [strongBridge enqueueApplicationScript:sourceCode url:secondaryBundleURL onComplete:^(NSError *error) {
+                    if (enqueueScriptCompletion) {
+                        enqueueScriptCompletion(error);
+                    }
+
+                    NSMutableDictionary *userInfo = [[NSMutableDictionary alloc] initWithDictionary:@ { @"url": secondaryBundleURLString, @"bridge": self }];
+                    if (error) {
+                        [userInfo setObject:error forKey:@"error"];
+                    }
+
+                    [[NSNotificationCenter defaultCenter] postNotificationName:HippySecondaryBundleDidLoadNotification object:self userInfo:userInfo];
+
+                    if (!error) {
+                        if (!self.loadedBundleURLs) {
+                            self.loadedBundleURLs = [[NSMutableDictionary alloc] init];
+                        }
+
+                        // 加载成功，保存Url，下次无需加载
+                        @synchronized(self) {
+                            [self.loadedBundleURLs setObject:@(YES) forKey:secondaryBundleURLString];
+                        }
+                    }
+
+                    batchedBridge.isSecondaryBundleLoading = NO;
+                    
+                    [self.performanceLogger markStopForTag:HippySecondaryExecuteSource];
+                    [self.performanceLogger markStopForTag:HippySecondaryStartup];
+
+                    if (completion) {
+                        if ([self.batchedBridge.javaScriptExecutor respondsToSelector:@selector(secondBundleLoadCompleted:)]) {
+                            [self.batchedBridge.javaScriptExecutor secondBundleLoadCompleted:!error];
+                        }
+                        completion(!error);
+                    }
+
+                    [self loadNextBundle];
+                }];
+            } else {
+                if (completion) {
+                    if ([self.batchedBridge.javaScriptExecutor respondsToSelector:@selector(secondBundleLoadCompleted:)]) {
+                        [self.batchedBridge.javaScriptExecutor secondBundleLoadCompleted:NO];
+                    }
+                    completion(NO);
+                }
+
+                [self loadNextBundle];
+            }
+        });
     }
 }
 
-- (HippyBridge *)bridge {
-    NSMapTable *mapTable = objc_getAssociatedObject(self, _cmd);
-    HippyBridge *bridge = [mapTable objectForKey:kBridgeKey];
-    return bridge;
+- (void)loadNextBundle {
+    @synchronized(self) {
+        if (self.pendingLoadBundles.count != 0) {
+            SecondaryBundle *bundle = self.pendingLoadBundles[0];
+            [self.pendingLoadBundles removeObject:bundle];
+            [self loadSecondary:bundle.url loadBundleCompletion:bundle.loadBundleCompletion enqueueScriptCompletion:bundle.enqueueScriptCompletion
+                             completion:bundle.completion];
+        }
+    }
 }
 
 @end

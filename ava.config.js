@@ -13,10 +13,7 @@ export default {
   extensions: false,
   compileEnhancements: false,
   files: [
-    'packages/**/__tests__/*.test.js',
-  ],
-  sources: [
-    'packages/**/*.js',
+    'framework/js/packages/**/__tests__/*.test.js',
   ],
   require: [
     'esm', // Use ES modules in NodeJS.

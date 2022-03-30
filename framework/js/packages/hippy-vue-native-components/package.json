@@ -1,0 +1,24 @@
+{
+  "name": "@hippy/vue-native-components",
+  "version": "2.1.2",
+  "description": "Native components middleware for Hippy-Vue, the components only for native, can't compatible with web.",
+  "main": "dist/index.js",
+  "homepage": "http://hippyjs.org",
+  "repository": "https://github.com/Tencent/Hippy/tree/master/packages/hippy-vue-native-components",
+  "author": "XQ Kuang <x@kxq.io>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/Tencent/Hippy/issues"
+  },
+  "keywords": [
+    "Hippy-Vue",
+    "Native",
+    "TabHost",
+    "ViewPager",
+    "RefreshWrapper",
+    "tab-host",
+    "view-pager",
+    "ul-refresh",
+    "waterfall"
+  ]
+}

@@ -1,39 +1,31 @@
-name: '[FrontEnd] check and build js code'
+name: '[front-end] check js code'
 
 on:
-  push:
-    paths:
-      - 'packages/**'
-      - 'examples/hippy-*-demo/**'
-      - 'scripts/**/*.js'
-      - 'core/js/**/*.js'
-    branches:
-      # Push events on main branch
-      - main
-      # Push events on master branch
-      - master
-    tags-ignore:
-      - '**'
   pull_request:
     paths:
-      - 'packages/**'
-      - 'examples/hippy-*-demo/**'
+      - 'framework/js/packages/**'
+      - 'framework/js/examples/hippy-*-demo/**'
+      - 'framework/js/core/js/**/*.js'
+      - 'package*.json'
       - 'scripts/**/*.js'
-      - 'core/js/**/*.js'
     branches:
       # Pull request events to main branch
       - main
       # Pull request events to master branch
       - master
+      # Pull request events to v3.0-dev branch
+      - v3.0-dev
+      # Pull request events to v3.0 branch
+      - v3.0
     tags-ignore:
       - '**'
 
 jobs:
-  check_and_build_js:
+  check_js:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [ 10.x, 13.x ]
+        node: [ 14.x ]
     steps:
       - uses: actions/checkout@v2
       - name: setup-node
@@ -42,13 +34,11 @@ jobs:
           node-version: ${{ matrix.node }}
           registry-url: https://npm.pkg.github.com
       - name: install
-        run: npm install
-      - name: lint
-        run: npm run lint
+        run: npm install && lerna bootstrap
+      - name: lint & build
+        run: npm run lint & npm run build
       - name: test
         run: npm run coverage
       - name: coverage
-        if: matrix.node == '10.x'
-        uses: codecov/codecov-action@v1
-      - name: build
-        run: npm run build
+        if: matrix.node == '14.x'
+        uses: codecov/codecov-action@v2

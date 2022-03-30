@@ -29,11 +29,12 @@
 #import "HippyShadowView.h"
 #import "HippyUtils.h"
 #import "UIView+Hippy.h"
-#import "HippyBridgeModule.h"
+#import "HippyModuleMethod.h"
 
 typedef void (^HippyPropBlock)(id<HippyComponent> view, id json);
 
-@interface HippyComponentProp : NSObject
+@interface HippyComponentProp : NSObject {
+}
 
 @property (nonatomic, copy, readonly) NSString *type;
 @property (nonatomic, copy) HippyPropBlock propBlock;
@@ -51,30 +52,34 @@ typedef void (^HippyPropBlock)(id<HippyComponent> view, id json);
 
 @end
 
-@implementation HippyComponentData {
+@interface HippyComponentData () {
     id<HippyComponent> _defaultView;  // Only needed for HIPPY_CUSTOM_VIEW_PROPERTY
     NSMutableDictionary<NSString *, HippyPropBlock> *_viewPropBlocks;
     NSMutableDictionary<NSString *, HippyPropBlock> *_shadowPropBlocks;
+    NSMutableDictionary<NSString *, NSString *> *_eventNameMap;
     BOOL _implementsUIBlockToAmendWithShadowViewRegistry;
-    __weak HippyBridge *_bridge;
+    __weak HippyViewManager *_manager;
+    NSDictionary<NSString *, id<HippyBridgeMethod>> *_methodsByName;
 }
 
-@synthesize manager = _manager;
+@end
 
-- (instancetype)initWithManagerClass:(Class)managerClass bridge:(HippyBridge *)bridge {
-    if ((self = [super init])) {
-        _bridge = bridge;
-        _managerClass = managerClass;
+@implementation HippyComponentData
+
+- (instancetype)initWithViewManager:(HippyViewManager *)viewManager viewName:(NSString *)viewName {
+    self = [super init];
+    if (self) {
+        _managerClass = [viewManager class];
+        _manager = viewManager;
         _viewPropBlocks = [NSMutableDictionary new];
         _shadowPropBlocks = [NSMutableDictionary new];
-
         // Hackety hack, this partially re-implements HippyBridgeModuleNameForClass
         // We want to get rid of Hippy and RK prefixes, but a lot of JS code still references
         // view names by prefix. So, while HippyBridgeModuleNameForClass now drops these
         // prefixes by default, we'll still keep them around here.
-        NSString *name = [managerClass moduleName];
+        NSString *name = viewName;
         if (name.length == 0) {
-            name = NSStringFromClass(managerClass);
+            name = NSStringFromClass(_managerClass);
         }
         if ([name hasPrefix:@"RK"]) {
             name = [name stringByReplacingCharactersInRange:(NSRange) { 0, @"RK".length } withString:@"Hippy"];
@@ -98,28 +103,17 @@ typedef void (^HippyPropBlock)(id<HippyComponent> view, id json);
     return self;
 }
 
-- (HippyViewManager *)manager {
-    if (!_manager) {
-        _manager = [_bridge moduleForClass:_managerClass];
-    }
-    return _manager;
-}
-
 HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
 
 - (UIView *)createViewWithTag:(NSNumber *)tag {
     HippyAssertMainQueue();
-
     UIView *view = [self.manager view];
     view.hippyTag = tag;
     view.multipleTouchEnabled = YES;
     view.userInteractionEnabled = YES;    // required for touch handling
     view.layer.allowsGroupOpacity = YES;  // required for touch handling
+    view.viewManager = self.manager;
     return view;
-}
-
-- (HippyVirtualNode *)createVirtualNode:(NSNumber *)tag props:(NSDictionary *)props {
-    return [self.manager node:tag name:_name props:props];
 }
 
 - (UIView *)createViewWithTag:(NSNumber *)tag initProps:(NSDictionary *)props {
@@ -130,6 +124,7 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
     view.multipleTouchEnabled = YES;
     view.userInteractionEnabled = YES;    // required for touch handling
     view.layer.allowsGroupOpacity = YES;  // required for touch handling
+    view.viewManager = self.manager;
     return view;
 }
 
@@ -208,50 +203,8 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
             // Build setter block
             void (^setterBlock)(id target, id json) = nil;
             if (type == NSSelectorFromString(@"HippyDirectEventBlock:")) {
-                // Special case for event handlers
-                __weak HippyViewManager *weakManager = self.manager;
-                setterBlock = ^(id target, id json) {
-                    __weak id<HippyComponent> weakTarget = target;
-                    id argu = nil;
-                    if ([HippyConvert BOOL:json]) {
-                        argu = ^(NSDictionary *body) {
-                            NSMutableDictionary *params = [NSMutableDictionary new];
-                            id tag = weakTarget.hippyTag;
-                            if (tag) {
-                                [params setObject:tag forKey:@"id"];
-                                [params setObject:tag forKey:@"target"];
-                            }
-#pragma clang diagnostic push
-#pragma clang diagnostic ignored "-Wdeprecated-declarations"
-                            static NSArray *defaultEvent = nil;
-                            static dispatch_once_t onceToken;
-                            dispatch_once(&onceToken, ^{
-                                if (defaultEvent == nil) {
-                                    defaultEvent = @[
-                                        @"onClick", @"onPressIn", @"onPressOut", @"onLongClick", @"onTouchDown", @"onTouchEnd", @"onTouchCancel",
-                                        @"onTouchMove"
-                                    ];
-                                }
-                            });
-
-                            if ([defaultEvent containsObject:key]) {
-                                [params setObject:key forKey:@"name"];
-                                if (body) {
-                                    [params addEntriesFromDictionary:body];
-                                }
-                                [weakManager.bridge.eventDispatcher dispatchEvent:@"EventDispatcher" methodName:@"receiveNativeGesture" args:params];
-                            } else {
-                                [params setValue:body ?: @{} forKey:@"extra"];
-                                [params setObject:key forKey:@"eventName"];
-                                [weakManager.bridge.eventDispatcher dispatchEvent:@"EventDispatcher" methodName:@"receiveUIComponentEvent"
-                                                                             args:params];
-                            }
-#pragma clang diagnostic pop
-                        };
-                    }
-                    ((void (*)(id, SEL, id))objc_msgSend)(target, setter, argu);
-                };
-
+                //TODO
+                //The component event response logic no longer executes this code
             } else {
                 // Ordinary property handlers
                 NSMethodSignature *typeSignature = [[HippyConvert class] methodSignatureForSelector:type];
@@ -276,9 +229,13 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
                     }                                                           \
                     setDefaultValue = YES;                                      \
                 }                                                               \
-                set(target, setter, convert([HippyConvert class], type, json)); \
+                if ([target respondsToSelector:setter]) {                       \
+                    set(target, setter, convert([HippyConvert class], type, json)); \
+                }                                                               \
             } else if (setDefaultValue) {                                       \
-                set(target, setter, defaultValue);                              \
+                if ([target respondsToSelector:setter]) {                       \
+                    set(target, setter, defaultValue);                          \
+                }                                                               \
             }                                                                   \
         };                                                                      \
         break;                                                                  \
@@ -373,9 +330,10 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
                 for (NSString *part in parts) {
                     target = [target valueForKey:part];
                 }
-
                 // Set property with json
-                setterBlock(target, HippyNilIfNull(json));
+                if (setterBlock) {
+                    setterBlock(target, HippyNilIfNull(json));
+                }
             };
         }
 
@@ -427,43 +385,72 @@ HIPPY_NOT_IMPLEMENTED(-(instancetype)init)
     }
 }
 
-- (NSDictionary<NSString *, id> *)viewConfig {
-    NSMutableArray<NSString *> *directEvents = [NSMutableArray new];
-    unsigned int count = 0;
-    NSMutableDictionary *propTypes = [NSMutableDictionary new];
-    Method *methods = class_copyMethodList(object_getClass(_managerClass), &count);
-    for (unsigned int i = 0; i < count; i++) {
-        Method method = methods[i];
-        SEL selector = method_getName(method);
-        NSString *methodName = NSStringFromSelector(selector);
-        if ([methodName hasPrefix:@"propConfig"]) {
-            NSRange nameRange = [methodName rangeOfString:@"_"];
-            if (nameRange.length) {
-                NSString *name = [methodName substringFromIndex:nameRange.location + 1];
-                NSString *type = ((NSArray<NSString *> * (*)(id, SEL)) objc_msgSend)(_managerClass, selector)[0];
-                if (HIPPY_DEBUG && propTypes[name] && ![propTypes[name] isEqualToString:type]) {
-                    HippyLogError(@"Property '%@' of component '%@' redefined from '%@' "
-                                   "to '%@'",
-                        name, _name, propTypes[name], type);
-                }
-
-                if ([type isEqualToString:@"HippyDirectEventBlock"]) {
-                    [directEvents addObject:HippyNormalizeInputEventName(name)];
-                    propTypes[name] = @"BOOL";
-                } else {
-                    propTypes[name] = type;
+- (NSDictionary<NSString *, NSString *> *)eventNameMap {
+    if (!_eventNameMap) {
+        uint32_t count = 0;
+        Method *methods = class_copyMethodList(object_getClass(_managerClass), &count);
+        _eventNameMap = [NSMutableDictionary dictionaryWithCapacity:count];
+        for (uint32_t i = 0; i < count; i++) {
+            Method method = methods[i];
+            SEL selector = method_getName(method);
+            NSString *methodName = NSStringFromSelector(selector);
+            if ([methodName hasPrefix:@"propConfig"]) {
+                NSRange nameRange = [methodName rangeOfString:@"_"];
+                if (nameRange.length) {
+                    NSString *name = [methodName substringFromIndex:nameRange.location + 1];
+                    NSString *type = ((NSArray<NSString *> * (*)(id, SEL)) objc_msgSend)(_managerClass, selector)[0];
+                    if ([type isEqualToString:@"HippyDirectEventBlock"]) {
+                        //remove 'on' prefix if exists
+                        NSString *nameNoOn = name;
+                        if ([nameNoOn hasPrefix:@"on"]) {
+                            nameNoOn = [name substringFromIndex:2];
+                        }
+                        NSString *nameNoOnLowerCase = [nameNoOn lowercaseString];
+                        [_eventNameMap setObject:name forKey:nameNoOnLowerCase];
+                    }
                 }
             }
         }
     }
-    free(methods);
-    return @{
-        @"propTypes": propTypes,
-        @"directEvents": directEvents,
-    };
+    return [_eventNameMap copy];
 }
 
-- (HippyViewManagerUIBlock)uiBlockToAmendWithShadowViewRegistry:(NSDictionary<NSNumber *, HippyShadowView *> *)registry {
+- (NSDictionary<NSString *, id<HippyBridgeMethod>> *)methodsByName {
+    if (!_methodsByName) {
+        [self methods];
+    }
+    return [_methodsByName copy];
+}
+
+- (void)methods {
+    if (!_methodsByName) {
+        NSMutableDictionary<NSString *, id<HippyBridgeMethod>> *methodsDic = [NSMutableDictionary dictionary];
+        unsigned int methodCount;
+        Class cls = _managerClass;
+        while (cls && cls != [NSObject class] && cls != [NSProxy class]) {
+            Method *methods = class_copyMethodList(object_getClass(cls), &methodCount);
+            for (unsigned int i = 0; i < methodCount; i++) {
+                Method method = methods[i];
+                SEL selector = method_getName(method);
+                if ([NSStringFromSelector(selector) hasPrefix:@"__hippy_export__"]) {
+                    IMP imp = method_getImplementation(method);
+                    NSArray<NSString *> *entries = ((NSArray<NSString *> * (*)(id, SEL)) imp)(_managerClass, selector);
+                    id<HippyBridgeMethod> moduleMethod =
+                        [[HippyModuleMethod alloc] initWithMethodSignature:entries[1]
+                                                              JSMethodName:entries[0]
+                                                               moduleClass:_managerClass];
+                    [methodsDic setObject:moduleMethod forKey:moduleMethod.JSMethodName];
+                }
+            }
+
+            free(methods);
+            cls = class_getSuperclass(cls);
+        }
+        _methodsByName = [methodsDic copy];
+    }
+}
+
+- (HippyRenderUIBlock)uiBlockToAmendWithShadowViewRegistry:(NSDictionary<NSNumber *, HippyShadowView *> *)registry {
     if (_implementsUIBlockToAmendWithShadowViewRegistry) {
         return [[self manager] uiBlockToAmendWithShadowViewRegistry:registry];
     }

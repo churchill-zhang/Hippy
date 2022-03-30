@@ -28,6 +28,7 @@
 #import "HippyUtils.h"
 #import "HippyTextSelection.h"
 #import "UIView+Hippy.h"
+#import "HippyEventDispatcher.h"
 
 @implementation HippyUITextView {
     BOOL _jsRequestingFirstResponder;
@@ -116,13 +117,11 @@
     }
 }
 
-- (instancetype)init {
-    if ((self = [super initWithFrame:CGRectZero])) {
-        //    _contentInset = UIEdgeInsetsZero;
+- (instancetype)initWithFrame:(CGRect)frame {
+    if ((self = [super initWithFrame:frame])) {
         [self setContentInset:UIEdgeInsetsZero];
         _placeholderTextColor = [self defaultPlaceholderTextColor];
         _blurOnSubmit = NO;
-
         _textView = [[HippyUITextView alloc] initWithFrame:CGRectZero];
         _textView.responderDelegate = self;
         _textView.backgroundColor = [UIColor clearColor];
@@ -143,7 +142,6 @@
     return self;
 }
 
-HIPPY_NOT_IMPLEMENTED(-(instancetype)initWithFrame : (CGRect)frame)
 HIPPY_NOT_IMPLEMENTED(-(instancetype)initWithCoder : (NSCoder *)aDecoder)
 
 - (void)insertHippySubview:(UIView *)subview atIndex:(NSInteger)index {

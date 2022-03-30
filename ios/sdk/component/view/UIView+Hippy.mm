@@ -21,21 +21,10 @@
  */
 
 #import "UIView+Hippy.h"
-
 #import <objc/runtime.h>
-
 #import "HippyAssert.h"
 #import "HippyLog.h"
 #import "HippyShadowView.h"
-#import "HippyVirtualNode.h"
-
-@interface RNWeakObject : NSObject
-@property (nonatomic, weak) id<HippyComponent> parent;
-@end
-
-@implementation RNWeakObject
-
-@end
 
 #define HippyEventMethod(name, value, type)                                                       \
     -(void)set##name : (type)value {                                                              \
@@ -95,15 +84,12 @@
     objc_setAssociatedObject(self, @selector(viewName), viewName, OBJC_ASSOCIATION_COPY_NONATOMIC);
 }
 
-- (void)setParent:(id<HippyComponent>)parent {
-    RNWeakObject *object = [[RNWeakObject alloc] init];
-    object.parent = parent;
-    objc_setAssociatedObject(self, @selector(parent), object, OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+- (NSString *)tagName {
+    return objc_getAssociatedObject(self, _cmd);
 }
 
-- (id<HippyComponent>)parent {
-    RNWeakObject *object = objc_getAssociatedObject(self, @selector(parent));
-    return object.parent;
+- (void)setTagName:(NSString *)tagName {
+    objc_setAssociatedObject(self, @selector(tagName), tagName, OBJC_ASSOCIATION_COPY_NONATOMIC);
 }
 
 // clang-format off
@@ -118,18 +104,19 @@ HippyEventMethod(OnTouchEnd, onTouchEnd, HippyDirectEventBlock)
 HippyEventMethod(OnAttachedToWindow, onAttachedToWindow, HippyDirectEventBlock)
 HippyEventMethod(OnDetachedFromWindow, onDetachedFromWindow, HippyDirectEventBlock)
 // clang-format on
-#if HIPPY_DEV
 
-- (HippyShadowView *)_DEBUG_hippyShadowView {
-    return objc_getAssociatedObject(self, _cmd);
+- (__kindof HippyShadowView *)hippyShadowView {
+    NSHashTable *hashTable = objc_getAssociatedObject(self, _cmd);
+    return [hashTable anyObject];
 }
 
-- (void)_DEBUG_setHippyShadowView:(HippyShadowView *)shadowView {
-    // Use assign to avoid keeping the shadowView alive it if no longer exists
-    objc_setAssociatedObject(self, @selector(_DEBUG_hippyShadowView), shadowView, OBJC_ASSOCIATION_ASSIGN);
+- (void)setHippyShadowView:(__kindof HippyShadowView *)shadowView {
+    NSHashTable *hashTable = [NSHashTable weakObjectsHashTable];
+    if (shadowView) {
+        [hashTable addObject:shadowView];
+    }
+    objc_setAssociatedObject(self, @selector(hippyShadowView), hashTable, OBJC_ASSOCIATION_RETAIN);
 }
-
-#endif
 
 - (void)sendAttachedToWindowEvent {
     if (self.onAttachedToWindow) {
@@ -190,6 +177,10 @@ HippyEventMethod(OnDetachedFromWindow, onDetachedFromWindow, HippyDirectEventBlo
     [subview removeFromSuperview];
 }
 
+- (void)removeFromHippySuperview {
+    [self.hippySuperview removeHippySubview:self];
+}
+
 - (void)resetHippySubviews {
     NSMutableArray *subviews = objc_getAssociatedObject(self, @selector(hippySubviews));
     if (subviews) {
@@ -200,12 +191,30 @@ HippyEventMethod(OnDetachedFromWindow, onDetachedFromWindow, HippyDirectEventBlo
     [self clearSortedSubviews];
 }
 
+- (UIView *)hippyRootView {
+    UIView *candidateRootView = self;
+    BOOL isHippyRootView = [candidateRootView isHippyRootView];
+    while (!isHippyRootView && !candidateRootView) {
+        candidateRootView = [candidateRootView superview];
+        isHippyRootView = [candidateRootView isHippyRootView];
+    }
+    return candidateRootView;
+}
+
 - (NSInteger)hippyZIndex {
     return [objc_getAssociatedObject(self, _cmd) integerValue];
 }
 
 - (void)setHippyZIndex:(NSInteger)hippyZIndex {
     objc_setAssociatedObject(self, @selector(hippyZIndex), @(hippyZIndex), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
+}
+
+- (BOOL)isHippySubviewsUpdated {
+    return [objc_getAssociatedObject(self, _cmd) integerValue];
+}
+
+- (void)setHippySubviewsUpdated:(BOOL)hippySubViewsUpdated {
+    objc_setAssociatedObject(self, @selector(isHippySubviewsUpdated), @(hippySubViewsUpdated), OBJC_ASSOCIATION_RETAIN_NONATOMIC);
 }
 
 - (NSArray<UIView *> *)sortedHippySubviews {
@@ -269,9 +278,6 @@ HippyEventMethod(OnDetachedFromWindow, onDetachedFromWindow, HippyDirectEventBlo
     self.frame = frame;
 }
 
-- (void)didUpdateWithNode:(__unused HippyVirtualNode *)node {
-}
-
 - (void)hippySetInheritedBackgroundColor:(__unused UIColor *)inheritedBackgroundColor {
     // Does nothing by default
 }
@@ -314,9 +320,10 @@ HippyEventMethod(OnDetachedFromWindow, onDetachedFromWindow, HippyDirectEventBlo
  * Responder overrides - to be deprecated.
  */
 - (void)hippyWillMakeFirstResponder {
-};
+}
 - (void)hippyDidMakeFirstResponder {
-};
+}
+
 - (BOOL)hippyRespondsToTouch:(__unused UITouch *)touch {
     return YES;
 }

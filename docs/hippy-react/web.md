@@ -16,7 +16,7 @@ hippy-react 通过 [@hippy/react-web](//www.npmjs.com/package/@hippy/react-web) 
 
 # 编译时依赖
 
-以官方提供的 [范例工程](//github.com/Tencent/Hippy/tree/master/examples/hippy-react-demo) 范例工程为例，需要使用 `npm i -D` 准备好以下依赖，当然开发者可以根据需要自行选择：
+以官方提供的 [范例工程](//github.com/Tencent/Hippy/tree/master/framework/js/examples/hippy-react-demo) 范例工程为例，需要使用 `npm i -D` 准备好以下依赖，当然开发者可以根据需要自行选择：
 
 | 包名                | 说明                          |
 | ------------------- | ----------------------------- |
@@ -29,11 +29,11 @@ hippy-react 通过 [@hippy/react-web](//www.npmjs.com/package/@hippy/react-web) 
 
 该配置展示了将 Hippy 运行于 Web 的最小化配置，并未包含分包等内容，开发者可以自行扩展。
 
-和 hippy-react 的主要区别在于做了一个 hippy-react 到 hippy-react-web 的 [alias](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/scripts/hippy-webpack.web.js#L80)，使之可以不用修改代码直接运行。
+和 hippy-react 的主要区别在于做了一个 hippy-react 到 hippy-react-web 的 [alias](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/scripts/hippy-webpack.web.js#L80)，使之可以不用修改代码直接运行。
 
 | 配置文件                                                     | 说明       |
 | ------------------------------------------------------------ | ---------- |
-| [hippy-webpack.web.js](//github.com/Tencent/Hippy/blob/master/examples/hippy-react-demo/scripts/hippy-webpack.web.js) | 调试用配置 |
+| [hippy-webpack.web.js](//github.com/Tencent/Hippy/blob/master/framework/js/examples/hippy-react-demo/scripts/hippy-webpack.web.js) | 调试用配置 |
 
 # 入口文件
 
@@ -55,3 +55,7 @@ hippy-react-web 使用了 [webpack-dev-server](//webpack.js.org/configuration/de
 # 启动调试
 
 执行 `npm run serve` 后就会启动 Web 调试，但要注意默认生成的 HTML 文件名是从 `package.json` 的 `name` 字段定义，而不是默认的 `index.html`，所以对于官方范例，需要使用 `http://localhost:8080/hippy-react-demo.html` 来访问调试用页面。
+
+# 转 Web 新方案
+
+未来 Hippy 会采用 `WebRenderer` 方案，增加基于公共通信协议的转换层，业务开发者可以使用同一套 Hippy 语法开发的业务代码，映射成 JS 实现的组件和模块，上层无论使用 React，Vue 或者其他第三方框架，都可以实现兼容，敬请期待。
