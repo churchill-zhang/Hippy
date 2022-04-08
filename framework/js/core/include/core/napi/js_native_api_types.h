@@ -39,8 +39,8 @@ class Scope;
 namespace hippy {
 namespace napi {
 
-static const char kErrorHandlerJSName[] = "ExceptionHandle.js";
-static const char kHippyErrorHandlerName[] = "HippyExceptionHandler";
+constexpr char kErrorHandlerJSName[] = "ExceptionHandle.js";
+constexpr char kHippyErrorHandlerName[] = "HippyExceptionHandler";
 
 enum PropertyAttribute {
   /** None. **/
@@ -75,6 +75,39 @@ class CtxValue {
  public:
   CtxValue() {}
   virtual ~CtxValue() {}
+};
+
+using GetterCallback = std::function<std::shared_ptr<CtxValue>()>;
+using SetterCallback = std::function<void(const std::shared_ptr<CtxValue>& value)>;
+using FunctionCallback = std::function<std::shared_ptr<CtxValue>(
+    size_t argument_count,
+    const std::shared_ptr<CtxValue> arguments[])>;
+template <typename T>
+using InstanceConstructor = std::function<std::shared_ptr<T>(const CallbackInfo& args)>;
+
+struct PropertyDefine {
+  using unicode_string_view = tdf::base::unicode_string_view;
+
+  GetterCallback getter;
+  SetterCallback setter;
+  unicode_string_view name;
+};
+
+struct FunctionDefine {
+  using unicode_string_view = tdf::base::unicode_string_view;
+
+  FunctionCallback cb;
+  unicode_string_view name;
+};
+
+template <typename T>
+struct InstanceDefine {
+  using unicode_string_view = tdf::base::unicode_string_view;
+
+  InstanceConstructor<T> constructor;
+  std::vector<PropertyDefine> properties{};
+  std::vector<FunctionDefine> functions{};
+  unicode_string_view name;
 };
 
 class Ctx {
