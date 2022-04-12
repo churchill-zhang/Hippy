@@ -22,7 +22,7 @@
 
 import ViewNode from '../dom/view-node';
 import Element from '../dom/element-node';
-import * as UIManagerModule from '../modules/ui-manager-module';
+// import * as UIManagerModule from '../modules/ui-manager-module';
 import { getRootViewId, getRootContainer } from '../utils/node';
 import { trace, warn } from '../utils';
 
@@ -73,23 +73,28 @@ function chunkNodes(batchNodes: BatchChunk[]) {
  */
 function batchUpdate(rootViewId: number): void {
   const chunks = chunkNodes(batchNodes);
+  const screenBuilder = new global.ScreenBuilder(rootViewId);
   chunks.forEach((chunk) => {
     switch (chunk.type) {
       case NODE_OPERATION_TYPES.createNode:
         trace(...componentName, 'createNode', chunk.nodes);
-        UIManagerModule.createNode(rootViewId, chunk.nodes);
+        screenBuilder.Create(chunk.nodes);
+        // UIManagerModule.createNode(rootViewId, chunk.nodes);
         break;
       case NODE_OPERATION_TYPES.updateNode:
         trace(...componentName, 'updateNode', chunk.nodes);
-        UIManagerModule.updateNode(rootViewId, chunk.nodes);
+        screenBuilder.Update(chunk.nodes);
+        // UIManagerModule.updateNode(rootViewId, chunk.nodes);
         break;
       case NODE_OPERATION_TYPES.deleteNode:
         trace(...componentName, 'deleteNode', chunk.nodes);
-        UIManagerModule.deleteNode(rootViewId, chunk.nodes);
+        screenBuilder.Delete(chunk.nodes);
+        // UIManagerModule.deleteNode(rootViewId, chunk.nodes);
         break;
       default:
     }
   });
+  screenBuilder.Build();
 }
 
 /**
@@ -107,13 +112,13 @@ function endBatch(isHookUsed = false): void {
   // if commitEffectsHook used, call batchUpdate synchronously
   if (isHookUsed) {
     batchUpdate(rootViewId);
-    UIManagerModule.endBatch();
+    // UIManagerModule.endBatch();
     batchNodes = [];
     batchIdle = true;
   } else {
     Promise.resolve().then(() => {
       batchUpdate(rootViewId);
-      UIManagerModule.endBatch();
+      // UIManagerModule.endBatch();
       batchNodes = [];
       batchIdle = true;
     });

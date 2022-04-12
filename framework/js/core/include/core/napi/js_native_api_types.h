@@ -81,9 +81,11 @@ using GetterCallback = std::function<std::shared_ptr<CtxValue>()>;
 using SetterCallback = std::function<void(const std::shared_ptr<CtxValue>& value)>;
 using FunctionCallback = std::function<std::shared_ptr<CtxValue>(
     size_t argument_count,
-    const std::shared_ptr<CtxValue> arguments[])>;
+    const std::shared_ptr<CtxValue> arguments[],
+    void* external)>;
 template <typename T>
-using InstanceConstructor = std::function<std::shared_ptr<T>(const CallbackInfo& args)>;
+using InstanceConstructor = std::function<std::shared_ptr<T>(size_t argument_count,
+                                                             const std::shared_ptr<CtxValue> arguments[])>;
 
 struct PropertyDefine {
   using unicode_string_view = tdf::base::unicode_string_view;
@@ -97,6 +99,7 @@ struct FunctionDefine {
   using unicode_string_view = tdf::base::unicode_string_view;
 
   FunctionCallback cb;
+  void* external;
   unicode_string_view name;
 };
 
@@ -120,6 +123,7 @@ class Ctx {
   virtual ~Ctx() { TDF_BASE_DLOG(INFO) << "~Ctx"; }
 
   virtual bool RegisterGlobalInJs() = 0;
+  virtual void RegisterClasses(std::weak_ptr<Scope> scope) = 0;
   virtual bool SetGlobalJsonVar(const unicode_string_view& name,
                                 const unicode_string_view& json) = 0;
   virtual bool SetGlobalStrVar(const unicode_string_view& name,

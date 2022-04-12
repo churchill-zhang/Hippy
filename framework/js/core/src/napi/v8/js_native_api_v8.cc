@@ -30,7 +30,7 @@
 #include "core/napi/v8/serializer.h"
 #include "v8/libplatform/libplatform.h"
 #include "v8/v8.h"
-
+#include "core/modules/ui_manager_module.h"
 
 
 namespace hippy {
@@ -531,44 +531,6 @@ bool V8Ctx::RegisterGlobalInJs() {
   v8::Context::Scope context_scope(context);
   v8::Local<v8::Object> global = context->Global();
 
-  // todo
-  using ScreenBuilder = hippy::dom::ScreenBuilder;
-  InstanceDefine<ScreenBuilder> def;
-  def.name = "ScreenBuilder";
-  def.constructor = [](const CallbackInfo& args) -> std::shared_ptr<ScreenBuilder> {
-    return std::make_shared<ScreenBuilder>();
-  };
-
-  FunctionDefine create_func_def;
-  create_func_def.name = "Create";
-  create_func_def.cb = [this](
-      size_t argument_count,
-      const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
-    return CreateBoolean(true);
-  };
-  def.functions.emplace_back(std::move(create_func_def));
-
-  FunctionDefine update_func_def;
-  update_func_def.name = "Update";
-  update_func_def.cb = [this](
-      size_t argument_count,
-      const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
-    return CreateBoolean(true);
-  };
-  def.functions.emplace_back(std::move(update_func_def));
-
-  FunctionDefine delete_func_def;
-  delete_func_def.name = "Delete";
-  delete_func_def.cb = [this](
-      size_t argument_count,
-      const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
-    return CreateBoolean(true);
-  };
-  def.functions.emplace_back(std::move(delete_func_def));
-  std::shared_ptr<InstanceDefine<ScreenBuilder>>
-      build = std::make_shared<InstanceDefine<ScreenBuilder>>(def);
-  RegisterInstance(build);
-
   return global
       ->Set(context,
             v8::String::NewFromOneByte(
@@ -577,6 +539,110 @@ bool V8Ctx::RegisterGlobalInJs() {
                 .ToLocalChecked(),
             global)
       .FromMaybe(false);
+}
+
+void V8Ctx::RegisterClasses(std::weak_ptr<Scope> weak_scope) {
+  // todo
+  using ScreenBuilder = hippy::dom::ScreenBuilder;
+  InstanceDefine<ScreenBuilder> def;
+  def.name = "ScreenBuilder";
+  def.constructor = [](size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<ScreenBuilder> {
+    return std::make_shared<ScreenBuilder>();
+  };
+
+  FunctionDefine create_func_def;
+  create_func_def.name = "Create";
+  create_func_def.cb = [weak_scope](
+      size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[],
+      void* external) -> std::shared_ptr<CtxValue> {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      auto weak_dom_manager = scope->GetDomManager();
+      auto dom_manager = weak_dom_manager.lock();
+      if (dom_manager) {
+        // info[0] rootId 兼容上个版本，暂时无用
+        std::shared_ptr<CtxValue> nodes = arguments[0];
+        auto ret = HandleJsValue(scope->GetContext(), nodes, scope);
+        dom_manager->CreateDomNodes(std::move(std::get<2>(ret)));
+      }
+    }
+    return nullptr;
+  };
+  create_func_def.external = static_cast<void*>(&weak_scope);
+  def.functions.emplace_back(std::move(create_func_def));
+
+  FunctionDefine update_func_def;
+  update_func_def.name = "Update";
+  update_func_def.cb = [weak_scope](
+      size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[],
+      void* external) -> std::shared_ptr<CtxValue> {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      auto weak_dom_manager = scope->GetDomManager();
+      auto dom_manager = weak_dom_manager.lock();
+      if (dom_manager) {
+        // info[0] rootId 兼容上个版本，暂时无用
+        std::shared_ptr<CtxValue> nodes = arguments[1];
+        auto ret = HandleJsValue(scope->GetContext(), nodes, scope);
+        dom_manager->UpdateDomNodes(std::move(std::get<2>(ret)));
+      }
+    }
+    return nullptr;
+  };
+  update_func_def.external = static_cast<void*>(&weak_scope);
+
+  FunctionDefine delete_func_def;
+  delete_func_def.name = "Delete";
+  delete_func_def.cb = [weak_scope](
+      size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[],
+      void* external) -> std::shared_ptr<CtxValue> {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      auto weak_dom_manager = scope->GetDomManager();
+      auto dom_manager = weak_dom_manager.lock();
+      if (dom_manager) {
+        // info[0] rootId 兼容上个版本，暂时无用
+        std::shared_ptr<CtxValue> nodes = arguments[1];
+        auto ret = HandleJsValue(scope->GetContext(), nodes, scope);
+        dom_manager->DeleteDomNodes(std::move(std::get<2>(ret)));
+      }
+    }
+    return nullptr;
+  };
+  delete_func_def.external = static_cast<void*>(&weak_scope);
+  def.functions.emplace_back(std::move(delete_func_def));
+
+  FunctionDefine build_func_def;
+  build_func_def.name = "Build";
+  build_func_def.cb = [weak_scope](
+      size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[],
+      void* external) -> std::shared_ptr<CtxValue> {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      auto weak_dom_manager = scope->GetDomManager();
+      auto dom_manager = weak_dom_manager.lock();
+      if (dom_manager) {
+        // info[0] rootId 兼容上个版本，暂时无用
+        dom_manager->EndBatch();
+      }
+    }
+    return nullptr;
+  };
+  build_func_def.external = static_cast<void*>(&weak_scope);
+  def.functions.emplace_back(std::move(build_func_def));
+
+  std::shared_ptr<InstanceDefine<ScreenBuilder>> build = std::make_shared<
+      InstanceDefine<ScreenBuilder>>(def);
+  auto scope = weak_scope.lock();
+  if (scope) {
+    scope->SaveClassInstance(build);
+  }
+  RegisterInstance(build, weak_scope);
 }
 
 bool V8Ctx::SetGlobalJsonVar(const unicode_string_view& name,

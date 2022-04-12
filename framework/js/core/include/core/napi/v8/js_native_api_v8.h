@@ -132,6 +132,7 @@ class V8Ctx : public Ctx {
   }
 
   virtual bool RegisterGlobalInJs() override;
+  virtual void RegisterClasses(std::weak_ptr<Scope> scope) override;
   virtual bool SetGlobalJsonVar(const unicode_string_view& name,
                                 const unicode_string_view& json) override;
   virtual bool SetGlobalStrVar(const unicode_string_view& name,
@@ -248,13 +249,16 @@ class V8Ctx : public Ctx {
 
   template <typename T>
   v8::Local<v8::FunctionTemplate> RegisterClass(v8::Local<v8::FunctionTemplate> func_template,
-                     const std::shared_ptr<InstanceDefine<T>> instance_define);
+                     const std::shared_ptr<InstanceDefine<T>> instance_define,
+                     std::weak_ptr<Scope> weak_scope);
 
   template <typename T>
-  v8::Local<v8::FunctionTemplate> NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define);
+  v8::Local<v8::FunctionTemplate> NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define,
+                                                 std::weak_ptr<Scope> scope);
 
   template <typename T>
-  void RegisterInstance(const std::shared_ptr<InstanceDefine<T>>& instance_define);
+  void RegisterInstance(const std::shared_ptr<InstanceDefine<T>>& instance_define,
+                        std::weak_ptr<Scope> scope);
 
   unicode_string_view ToStringView(v8::Local<v8::String> str) const;
   unicode_string_view GetMsgDesc(v8::Local<v8::Message> message);
@@ -292,7 +296,8 @@ struct V8CtxValue : public CtxValue {
 
 template <typename T>
 v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTemplate> func_template,
-                          const std::shared_ptr<InstanceDefine<T>> instance_define) {
+                          const std::shared_ptr<InstanceDefine<T>> instance_define,
+                          std::weak_ptr<Scope> weak_scope) {
   // if (!instance_define.constructor) {
     // return; // todo
   //}
@@ -352,7 +357,7 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTempl
           for (int i = 0; i < len; i++) {
             param[i] = std::make_shared<V8CtxValue>(isolate, info[i]);
           }
-          auto return_value = (ptr->cb)((size_t)len, param);
+          auto return_value = (ptr->cb)((size_t)len, param, ptr->external);
         },
         v8::External::New(isolate_, const_cast<FunctionDefine*>(&func)));
     // instance->Set(name, fn, v8::PropertyAttribute::DontDelete);
@@ -363,13 +368,16 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTempl
 }
 
 template <typename T>
-v8::Local<v8::FunctionTemplate> V8Ctx::NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define) {
-  v8::HandleScope handle_scope(isolate_);
+v8::Local<v8::FunctionTemplate> V8Ctx::NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define,
+                                                      std::weak_ptr<Scope> weak_scope) {
+  // v8::HandleScope handle_scope(isolate_);
+  v8::EscapableHandleScope escape_scope(isolate_);
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);
   v8::Context::Scope context_scope(context);
 
   v8::Local<v8::Object> data = v8::Object::New(isolate_);
   auto ret = data->Set(context, 0, v8::External::New(isolate_, instance_define.get()));
+  // ret = data->Set(context, 1, v8::External::New(isolate_, (void*)&weak_scope));
   HIPPY_USE(ret);
   auto function = v8::FunctionTemplate::New(
       isolate_,
@@ -379,35 +387,38 @@ v8::Local<v8::FunctionTemplate> V8Ctx::NewConstructor(const std::shared_ptr<Inst
         }
         auto context = info.GetIsolate()->GetCurrentContext();
         v8::Local<v8::Object> data = info.Data().As<v8::Object>();
-        auto instance_define = reinterpret_cast<InstanceDefine<T>*>(
+        auto* instance_define = reinterpret_cast<InstanceDefine<T>*>(
             data->Get(context, 0).ToLocalChecked().As<v8::External>()->Value());
-        auto& constructor = instance_define->constructor;
-        auto isolate = info.GetIsolate();
-        std::vector<std::shared_ptr<CtxValue>> param;
-        auto len = info.Length();
-        for (int i = 0; i < len; i++) {
-          param.template emplace_back(std::make_shared<V8CtxValue>(isolate, info[i]));
+        if (!instance_define) {
+          return; //todo
         }
-        CallbackInfo callback_info(nullptr); // todo
-        std::shared_ptr<hippy::ScreenBuilder> ret = constructor(callback_info);
+        auto constructor = instance_define->constructor;
+        auto isolate = info.GetIsolate();
+        auto len = info.Length();
+        std::shared_ptr<CtxValue> arguments[len];
+        for (int i = 0; i < len; i++) {
+          arguments[i] = std::make_shared<V8CtxValue>(isolate, info[i]);
+        }
+        std::shared_ptr<hippy::ScreenBuilder> ret = constructor((size_t)len, arguments);
         if (ret) {
           info.This()->SetAlignedPointerInInternalField(0, ret.get());
         }
       },
       data);
-  // function->InstanceTemplate()->SetInternalFieldCount(1);
-  // RegisterClass(function, instance_define);
-  return function;
+  function->InstanceTemplate()->SetInternalFieldCount(1);
+  RegisterClass(function, instance_define, weak_scope);
+  return escape_scope.template Escape(function);
 }
 
 template <typename T>
-void V8Ctx::RegisterInstance(const std::shared_ptr<InstanceDefine<T>>& instance_define) {
+void V8Ctx::RegisterInstance(const std::shared_ptr<InstanceDefine<T>>& instance_define,
+                             std::weak_ptr<Scope> scope) {
   v8::HandleScope handle_scope(isolate_);
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);
   v8::Context::Scope context_scope(context);
   v8::Local<v8::Object> global = context->Global();
   auto name = CreateV8String(instance_define->name);
-  v8::Local<v8::FunctionTemplate> func_template = NewConstructor(instance_define);
+  v8::Local<v8::FunctionTemplate> func_template = NewConstructor(instance_define, scope);
   if (!func_template.IsEmpty()) {
     auto func = func_template->GetFunction(context);
     if (!func.IsEmpty()) {

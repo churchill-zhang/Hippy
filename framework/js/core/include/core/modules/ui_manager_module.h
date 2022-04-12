@@ -47,9 +47,13 @@ class UIManagerModule : public ModuleBase {
   void CreateNodes(const CallbackInfo& info);
   void UpdateNodes(const CallbackInfo& info);
   void DeleteNodes(const CallbackInfo& info);
-  void StartBatch(const CallbackInfo& info);
   void EndBatch(const CallbackInfo& info);
   void CallUIFunction(const CallbackInfo& info);
 
  private:
 };
+
+std::tuple<bool, std::string, std::vector<std::shared_ptr<hippy::dom::DomNode>>> HandleJsValue(
+    const std::shared_ptr<hippy::napi::Ctx> &context,
+    const std::shared_ptr<hippy::napi::CtxValue> &nodes,
+    const std::shared_ptr<Scope> &scope);
