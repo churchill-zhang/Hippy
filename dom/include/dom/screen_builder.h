@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <vector>
+#include <mutex>
 
 #include "dom/dom_manager.h"
 #include "dom/dom_node.h"
@@ -21,6 +22,7 @@ class ScreenBuilder {
   Screen Build(const std::weak_ptr<DomManager>& dom_manager);
  private:
   std::vector<std::function<void()>> ops_;
+  std::mutex mutex_;
 };
 
 }
