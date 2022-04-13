@@ -57,12 +57,8 @@ std::shared_ptr<InstanceDefine<ScreenBuilder>> RegisterScreenBuilder(const std::
     auto scope = weak_scope.lock();
     if (scope) {
       auto weak_dom_manager = scope->GetDomManager();
-      auto dom_manager = weak_dom_manager.lock();
-      if (dom_manager) {
-        std::shared_ptr<CtxValue> nodes = arguments[0];
-        auto ret = HandleJsValue(scope->GetContext(), nodes, scope);
-        dom_manager->CreateDomNodes(std::move(std::get<2>(ret)));
-      }
+      auto ret = HandleJsValue(scope->GetContext(), arguments[0], scope);
+      builder->Create(weak_dom_manager, std::move(std::get<2>(ret)));
     }
     return nullptr;
   };
@@ -77,12 +73,8 @@ std::shared_ptr<InstanceDefine<ScreenBuilder>> RegisterScreenBuilder(const std::
     auto scope = weak_scope.lock();
     if (scope) {
       auto weak_dom_manager = scope->GetDomManager();
-      auto dom_manager = weak_dom_manager.lock();
-      if (dom_manager) {
-        std::shared_ptr<CtxValue> nodes = arguments[0];
-        auto ret = HandleJsValue(scope->GetContext(), nodes, scope);
-        dom_manager->UpdateDomNodes(std::move(std::get<2>(ret)));
-      }
+      auto ret = HandleJsValue(scope->GetContext(), arguments[0], scope);
+      builder->Update(weak_dom_manager, std::move(std::get<2>(ret)));
     }
     return nullptr;
   };
@@ -96,12 +88,8 @@ std::shared_ptr<InstanceDefine<ScreenBuilder>> RegisterScreenBuilder(const std::
     auto scope = weak_scope.lock();
     if (scope) {
       auto weak_dom_manager = scope->GetDomManager();
-      auto dom_manager = weak_dom_manager.lock();
-      if (dom_manager) {
-        std::shared_ptr<CtxValue> nodes = arguments[0];
-        auto ret = HandleJsValue(scope->GetContext(), nodes, scope);
-        dom_manager->DeleteDomNodes(std::move(std::get<2>(ret)));
-      }
+      auto ret = HandleJsValue(scope->GetContext(), arguments[0], scope);
+      builder->Delete(weak_dom_manager, std::move(std::get<2>(ret)));
     }
     return nullptr;
   };
@@ -116,9 +104,12 @@ std::shared_ptr<InstanceDefine<ScreenBuilder>> RegisterScreenBuilder(const std::
     auto scope = weak_scope.lock();
     if (scope) {
       auto weak_dom_manager = scope->GetDomManager();
+      auto screen = builder->Build(weak_dom_manager);
       auto dom_manager = weak_dom_manager.lock();
       if (dom_manager) {
-        dom_manager->EndBatch();
+        dom_manager->PostTask([screen]() {
+          screen.Build();
+        });
       }
     }
     return nullptr;

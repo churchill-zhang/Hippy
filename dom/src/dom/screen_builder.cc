@@ -1,5 +1,7 @@
 #include "dom/screen_builder.h"
 
+#include "base/logging.h"
+
 namespace hippy {
 inline namespace dom {
 
@@ -33,7 +35,13 @@ void ScreenBuilder::Delete(const std::weak_ptr<DomManager>& dom_manager,
   });
 }
 
-Screen ScreenBuilder::Build() {
+Screen ScreenBuilder::Build(const std::weak_ptr<DomManager>& dom_manager) {
+  ops_.emplace_back([dom_manager]{
+    auto manager = dom_manager.lock();
+    if (manager) {
+      manager->EndBatch();
+    }
+  });
   return Screen(std::move(ops_));
 }
 

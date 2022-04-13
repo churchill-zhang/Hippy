@@ -392,8 +392,22 @@ v8::Local<v8::FunctionTemplate> V8Ctx::NewConstructor(const std::shared_ptr<Inst
           arguments[i] = std::make_shared<V8CtxValue>(isolate, info[i]);
         }
         std::shared_ptr<T> ret = constructor((size_t)len, arguments);
+        instance_define->holder.insert({ ret.get(), ret }); // 插入和删除都在同一个js线程，暂时不用加锁
+        auto obj = info.This();
         if (ret) {
-          info.This()->SetAlignedPointerInInternalField(0, ret.get());
+          obj->SetAlignedPointerInInternalField(0, ret.get());
+          v8::Global<v8::Value> weak(isolate, obj);
+          weak.SetWeak(instance_define,
+                       [](const v8::WeakCallbackInfo<InstanceDefine<T>>& info) {
+            auto* instance_define = static_cast<InstanceDefine<T>*>(info.GetParameter());
+            auto* constructor_ptr = info.GetInternalField(0);
+            auto holder = instance_define->holder;
+            // 插入和删除都在同一个js线程，暂时不用加锁
+            auto it = holder.find(constructor_ptr);
+            if (it != holder.end()) {
+              holder.erase(it);
+            }
+          }, v8::WeakCallbackType::kParameter);
         }
       },
       data);

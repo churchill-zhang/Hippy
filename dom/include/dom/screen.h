@@ -11,7 +11,7 @@ class Screen {
   Screen(std::vector<std::function<void()>>&& ops);
   ~Screen() = default;
 
-  void Build();
+  void Build() const;
 
  private:
   std::vector<std::function<void()>> ops_;

@@ -1673,8 +1673,7 @@ uint32_t V8Ctx::GetArrayLength(const std::shared_ptr<CtxValue>& value) {
   std::shared_ptr<V8CtxValue> ctx_value =
       std::static_pointer_cast<V8CtxValue>(value);
   const v8::Global<v8::Value>& global_value = ctx_value->global_value_;
-  v8::Local<v8::Value> handle_value =
-      v8::Local<v8::Value>::New(isolate_, global_value);
+  v8::Local<v8::Value> handle_value = v8::Local<v8::Value>::New(isolate_, global_value);
 
   if (handle_value.IsEmpty()) {
     return 0;

@@ -8,7 +8,7 @@ inline namespace dom {
 
 Screen::Screen(std::vector<std::function<void()>>&& ops): ops_(std::move(ops)) {}
 
-void Screen::Build() {
+void Screen::Build() const {
   for (const auto& op: ops_) {
     op();
   }

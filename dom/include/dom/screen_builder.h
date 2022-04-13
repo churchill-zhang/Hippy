@@ -18,7 +18,7 @@ class ScreenBuilder {
   void Create(const std::weak_ptr<DomManager>& dom_manager, std::vector<std::shared_ptr<DomNode>>&& nodes);
   void Update(const std::weak_ptr<DomManager>& dom_manager, std::vector<std::shared_ptr<DomNode>>&& nodes);
   void Delete(const std::weak_ptr<DomManager>& dom_manager, std::vector<std::shared_ptr<DomNode>>&& nodes);
-  Screen Build();
+  Screen Build(const std::weak_ptr<DomManager>& dom_manager);
  private:
   std::vector<std::function<void()>> ops_;
 };
