@@ -40,6 +40,7 @@
 #include "core/napi/native_source_code.h"
 #include "core/scope.h"
 #include "dom/screen_builder.h"
+#include "core/modules/screen_bulider.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
@@ -132,7 +133,6 @@ class V8Ctx : public Ctx {
   }
 
   virtual bool RegisterGlobalInJs() override;
-  virtual void RegisterClasses(std::weak_ptr<Scope> scope) override;
   virtual bool SetGlobalJsonVar(const unicode_string_view& name,
                                 const unicode_string_view& json) override;
   virtual bool SetGlobalStrVar(const unicode_string_view& name,
@@ -248,17 +248,19 @@ class V8Ctx : public Ctx {
       const std::shared_ptr<DomValue>& value) override;
 
   template <typename T>
-  v8::Local<v8::FunctionTemplate> RegisterClass(v8::Local<v8::FunctionTemplate> func_template,
-                     const std::shared_ptr<InstanceDefine<T>> instance_define,
-                     std::weak_ptr<Scope> weak_scope);
+  v8::Local<v8::FunctionTemplate> RegisterPrototype(v8::Local<v8::FunctionTemplate> func_template,
+                                                    const std::shared_ptr<InstanceDefine<T>> instance_define);
 
   template <typename T>
-  v8::Local<v8::FunctionTemplate> NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define,
-                                                 std::weak_ptr<Scope> scope);
+  v8::Local<v8::FunctionTemplate> NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define);
+
+  virtual void RegisterClasses(std::weak_ptr<Scope> scope) override {
+    auto build = hippy::RegisterScreenBuilder(scope);
+    RegisterJsClass(build);
+  }
 
   template <typename T>
-  void RegisterInstance(const std::shared_ptr<InstanceDefine<T>>& instance_define,
-                        std::weak_ptr<Scope> scope);
+  void RegisterJsClass(const std::shared_ptr<InstanceDefine<T>>& instance_define);
 
   unicode_string_view ToStringView(v8::Local<v8::String> str) const;
   unicode_string_view GetMsgDesc(v8::Local<v8::Message> message);
@@ -295,21 +297,14 @@ struct V8CtxValue : public CtxValue {
 };
 
 template <typename T>
-v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTemplate> func_template,
-                          const std::shared_ptr<InstanceDefine<T>> instance_define,
-                          std::weak_ptr<Scope> weak_scope) {
-  // if (!instance_define.constructor) {
-    // return; // todo
-  //}
-
+v8::Local<v8::FunctionTemplate> V8Ctx::RegisterPrototype(v8::Local<v8::FunctionTemplate> func_template,
+                                                         const std::shared_ptr<InstanceDefine<T>> instance_define) {
   v8::HandleScope handle_scope(isolate_);
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);
   v8::Context::Scope context_scope(context);
 
   v8::Local<v8::FunctionTemplate> constructor = v8::FunctionTemplate::New(isolate_);
   auto instance = constructor->PrototypeTemplate();
-  // auto accessSignature = v8::AccessorSignature::New(isolate_, funcT);
-  // auto signature = v8::Signature::New(isolate_, funcT);
   for (auto& prop : instance_define->properties) {
     auto name = CreateV8String(prop.name);
 
@@ -319,9 +314,9 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTempl
     if (prop.getter) {
       getter = [](v8::Local<v8::String> property, const v8::PropertyCallbackInfo<v8::Value>& info) {
         auto ptr = static_cast<decltype(&prop)>(info.Data().As<v8::External>()->Value());
-        // auto thiz = static_cast<T*>(info.This()->GetAlignedPointerFromInternalField(0));
+        auto thiz = static_cast<T*>(info.This()->GetAlignedPointerFromInternalField(0));
         auto& getter = ptr->getter;
-        auto ret = std::static_pointer_cast<V8CtxValue>(getter()); // todo
+        auto ret = std::static_pointer_cast<V8CtxValue>(getter(thiz));
         info.GetReturnValue().Set(ret->global_value_);
       };
     }
@@ -330,16 +325,15 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTempl
       setter = [](v8::Local<v8::String> property, v8::Local<v8::Value> value,
                   const v8::PropertyCallbackInfo<void>& info) {
         auto ptr = static_cast<decltype(&prop)>(info.Data().As<v8::External>()->Value());
-        // auto thiz = static_cast<T*>(info.This()->GetAlignedPointerFromInternalField(0));
+        auto thiz = static_cast<T*>(info.This()->GetAlignedPointerFromInternalField(0));
         auto& setter = ptr->setter;
         auto ctx_value = std::make_shared<V8CtxValue>(info.GetIsolate(), value);
-        setter(ctx_value);
+        setter(thiz, ctx_value);
       };
     }
 
     instance->SetAccessor(name, getter, setter,
-        v8::External::New(isolate_,
-                          const_cast<PropertyDefine*>(&prop)),
+        v8::External::New(isolate_, const_cast<PropertyDefine<T>*>(&prop)),
         v8::AccessControl::DEFAULT, v8::PropertyAttribute::DontDelete);
   }
 
@@ -348,81 +342,78 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterClass(v8::Local<v8::FunctionTempl
     auto fn = v8::FunctionTemplate::New(
         isolate_,
         [](const v8::FunctionCallbackInfo<v8::Value>& info) {
-          auto ptr = static_cast<FunctionDefine*>(info.Data().As<v8::External>()->Value());
-          // auto thiz = static_cast<T*>(info.This()->GetAlignedPointerFromInternalField(0));
-          // auto engine = static_cast<ScriptClass*>(thiz)->getScriptEngineAs<V8Engine>();
+          auto ptr = static_cast<FunctionDefine<T>*>(info.Data().As<v8::External>()->Value());
+          auto thiz = static_cast<T*>(info.This()->GetAlignedPointerFromInternalField(0));
           auto isolate = info.GetIsolate();
           auto len = info.Length();
           std::shared_ptr<CtxValue> param[len];
           for (int i = 0; i < len; i++) {
             param[i] = std::make_shared<V8CtxValue>(isolate, info[i]);
           }
-          auto return_value = (ptr->cb)((size_t)len, param, ptr->external);
+          (ptr->cb)(thiz, (size_t)len, param);
         },
-        v8::External::New(isolate_, const_cast<FunctionDefine*>(&func)));
-    // instance->Set(name, fn, v8::PropertyAttribute::DontDelete);
-    func_template->PrototypeTemplate()->Set(name, fn,
-                                            v8::PropertyAttribute::DontDelete);
+        v8::External::New(isolate_, const_cast<FunctionDefine<T>*>(&func)));
+    func_template->PrototypeTemplate()->Set(name, fn, v8::PropertyAttribute::DontDelete);
   }
   return func_template;
 }
 
 template <typename T>
-v8::Local<v8::FunctionTemplate> V8Ctx::NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define,
-                                                      std::weak_ptr<Scope> weak_scope) {
-  // v8::HandleScope handle_scope(isolate_);
+v8::Local<v8::FunctionTemplate> V8Ctx::NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define) {
   v8::EscapableHandleScope escape_scope(isolate_);
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);
   v8::Context::Scope context_scope(context);
 
   v8::Local<v8::Object> data = v8::Object::New(isolate_);
   auto ret = data->Set(context, 0, v8::External::New(isolate_, instance_define.get()));
-  // ret = data->Set(context, 1, v8::External::New(isolate_, (void*)&weak_scope));
   HIPPY_USE(ret);
   auto function = v8::FunctionTemplate::New(
       isolate_,
       [](const v8::FunctionCallbackInfo<v8::Value>& info) {
+        auto isolate = info.GetIsolate();
         if (!info.IsConstructCall()) {
-          return; // todo
+          isolate->ThrowException(v8::Exception::Error(
+              v8::String::NewFromOneByte(isolate,reinterpret_cast<const uint8_t*>(
+                                             "Cannot call constructor as function")).ToLocalChecked()));
+          info.GetReturnValue().SetUndefined();
+          return;
         }
-        auto context = info.GetIsolate()->GetCurrentContext();
+        auto context = isolate->GetCurrentContext();
         v8::Local<v8::Object> data = info.Data().As<v8::Object>();
         auto* instance_define = reinterpret_cast<InstanceDefine<T>*>(
             data->Get(context, 0).ToLocalChecked().As<v8::External>()->Value());
         if (!instance_define) {
-          return; //todo
+          TDF_BASE_UNREACHABLE();
         }
         auto constructor = instance_define->constructor;
-        auto isolate = info.GetIsolate();
         auto len = info.Length();
         std::shared_ptr<CtxValue> arguments[len];
         for (int i = 0; i < len; i++) {
           arguments[i] = std::make_shared<V8CtxValue>(isolate, info[i]);
         }
-        std::shared_ptr<hippy::ScreenBuilder> ret = constructor((size_t)len, arguments);
+        std::shared_ptr<T> ret = constructor((size_t)len, arguments);
         if (ret) {
           info.This()->SetAlignedPointerInInternalField(0, ret.get());
         }
       },
       data);
   function->InstanceTemplate()->SetInternalFieldCount(1);
-  RegisterClass(function, instance_define, weak_scope);
+  RegisterPrototype(function, instance_define);
   return escape_scope.template Escape(function);
 }
 
 template <typename T>
-void V8Ctx::RegisterInstance(const std::shared_ptr<InstanceDefine<T>>& instance_define,
-                             std::weak_ptr<Scope> scope) {
+void V8Ctx::RegisterJsClass(const std::shared_ptr<InstanceDefine<T>>& instance_define) {
   v8::HandleScope handle_scope(isolate_);
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);
   v8::Context::Scope context_scope(context);
+
   v8::Local<v8::Object> global = context->Global();
-  auto name = CreateV8String(instance_define->name);
-  v8::Local<v8::FunctionTemplate> func_template = NewConstructor(instance_define, scope);
+  v8::Local<v8::FunctionTemplate> func_template = NewConstructor(instance_define);
   if (!func_template.IsEmpty()) {
     auto func = func_template->GetFunction(context);
     if (!func.IsEmpty()) {
-      auto ret = global->Set(context, name, func.ToLocalChecked());
+      auto ret = global->Set(context,  CreateV8String(instance_define->name), func.ToLocalChecked());
       HIPPY_USE(ret);
     }
   }

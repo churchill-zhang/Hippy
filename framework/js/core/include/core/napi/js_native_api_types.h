@@ -77,29 +77,36 @@ class CtxValue {
   virtual ~CtxValue() {}
 };
 
-using GetterCallback = std::function<std::shared_ptr<CtxValue>()>;
-using SetterCallback = std::function<void(const std::shared_ptr<CtxValue>& value)>;
+template <typename T>
+using GetterCallback = std::function<std::shared_ptr<CtxValue>(T* thiz)>;
+
+template <typename T>
+using SetterCallback = std::function<void(T* thiz, const std::shared_ptr<CtxValue>& value)>;
+
+template <typename T>
 using FunctionCallback = std::function<std::shared_ptr<CtxValue>(
+    T* thiz,
     size_t argument_count,
-    const std::shared_ptr<CtxValue> arguments[],
-    void* external)>;
+    const std::shared_ptr<CtxValue> arguments[])>;
+
 template <typename T>
 using InstanceConstructor = std::function<std::shared_ptr<T>(size_t argument_count,
                                                              const std::shared_ptr<CtxValue> arguments[])>;
 
+template <typename T>
 struct PropertyDefine {
   using unicode_string_view = tdf::base::unicode_string_view;
 
-  GetterCallback getter;
-  SetterCallback setter;
+  GetterCallback<T> getter;
+  SetterCallback<T> setter;
   unicode_string_view name;
 };
 
+template <typename T>
 struct FunctionDefine {
   using unicode_string_view = tdf::base::unicode_string_view;
 
-  FunctionCallback cb;
-  void* external;
+  FunctionCallback<T> cb;
   unicode_string_view name;
 };
 
@@ -108,8 +115,8 @@ struct InstanceDefine {
   using unicode_string_view = tdf::base::unicode_string_view;
 
   InstanceConstructor<T> constructor;
-  std::vector<PropertyDefine> properties{};
-  std::vector<FunctionDefine> functions{};
+  std::vector<PropertyDefine<T>> properties{};
+  std::vector<FunctionDefine<T>> functions{};
   unicode_string_view name;
 };
 
