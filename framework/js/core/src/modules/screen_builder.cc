@@ -23,6 +23,7 @@
 #include "core/modules/screen_bulider.h"
 
 #include "core/scope.h"
+#include "base/unicode_string_view.h"
 #include "core/napi/js_native_api_types.h"
 #include "core/modules/ui_manager_module.h"
 #include "dom/screen_builder.h"
@@ -94,6 +95,32 @@ std::shared_ptr<InstanceDefine<ScreenBuilder>> RegisterScreenBuilder(const std::
     return nullptr;
   };
   def.functions.emplace_back(std::move(delete_func_def));
+
+  FunctionDefine<ScreenBuilder> add_event_listener_def;
+  add_event_listener_def.name = "AddEventListener";
+  add_event_listener_def.cb = [weak_scope](
+      ScreenBuilder* builder,
+      size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      builder->AddEventListener(scope, argument_count, arguments);
+    }
+    return nullptr;
+  };
+  def.functions.emplace_back(std::move(add_event_listener_def));
+
+  // TODO remove event listener
+  FunctionDefine<ScreenBuilder> remove_event_listener_def;
+  remove_event_listener_def.name = "RemoveEventListener";
+  remove_event_listener_def.cb = [weak_scope](
+      ScreenBuilder* builder,
+      size_t argument_count,
+      const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
+    return nullptr;
+  };
+  def.functions.emplace_back(std::move(remove_event_listener_def));
+
 
   FunctionDefine<ScreenBuilder> build_func_def;
   build_func_def.name = "Build";

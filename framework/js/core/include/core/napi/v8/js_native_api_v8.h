@@ -41,6 +41,8 @@
 #include "core/scope.h"
 #include "dom/screen_builder.h"
 #include "core/modules/screen_bulider.h"
+#include "core/modules/event_module.h"
+#include "dom/dom_event.h"
 
 #pragma clang diagnostic push
 #pragma clang diagnostic ignored "-Wconversion"
@@ -262,6 +264,9 @@ class V8Ctx : public Ctx {
   template <typename T>
   void RegisterJsClass(const std::shared_ptr<InstanceDefine<T>>& instance_define);
 
+
+  virtual void RegisterEvent(std::weak_ptr<Scope> scope, const std::shared_ptr<CtxValue> callback, std::shared_ptr<DomEvent>& dom_event) override;
+
   unicode_string_view ToStringView(v8::Local<v8::String> str) const;
   unicode_string_view GetMsgDesc(v8::Local<v8::Message> message);
   unicode_string_view GetStackInfo(v8::Local<v8::Message> message);
@@ -303,8 +308,7 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterPrototype(v8::Local<v8::FunctionT
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);
   v8::Context::Scope context_scope(context);
 
-  v8::Local<v8::FunctionTemplate> constructor = v8::FunctionTemplate::New(isolate_);
-  auto instance = constructor->PrototypeTemplate();
+  v8::Local<v8::ObjectTemplate> instance_template = func_template->InstanceTemplate();
   for (auto& prop : instance_define->properties) {
     auto name = CreateV8String(prop.name);
 
@@ -332,7 +336,7 @@ v8::Local<v8::FunctionTemplate> V8Ctx::RegisterPrototype(v8::Local<v8::FunctionT
       };
     }
 
-    instance->SetAccessor(name, getter, setter,
+    instance_template->SetAccessor( name, getter, setter,
         v8::External::New(isolate_, const_cast<PropertyDefine<T>*>(&prop)),
         v8::AccessControl::DEFAULT, v8::PropertyAttribute::DontDelete);
   }

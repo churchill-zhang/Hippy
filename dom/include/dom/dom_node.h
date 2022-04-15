@@ -76,7 +76,7 @@ class DomNode : public std::enable_shared_from_this<DomNode> {
   void AddChildAt(const std::shared_ptr<DomNode> &dom_node, int32_t index);
   std::shared_ptr<DomNode> RemoveChildAt(int32_t index);
   void DoLayout();
-  void HandleEvent(const std::shared_ptr<DomEvent> &event);
+  void HandleEvent(std::shared_ptr<DomEvent> &event);
   void ParseLayoutStyleInfo();
   /**
    * this method should run in dom taskrunner

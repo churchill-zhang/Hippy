@@ -49,8 +49,6 @@ class UIManagerModule : public ModuleBase {
   void DeleteNodes(const CallbackInfo& info);
   void EndBatch(const CallbackInfo& info);
   void CallUIFunction(const CallbackInfo& info);
-
- private:
 };
 
 std::tuple<bool, std::string, std::vector<std::shared_ptr<hippy::dom::DomNode>>> HandleJsValue(
