@@ -2,6 +2,7 @@
 
 #include <functional>
 #include <vector>
+#include <mutex>
 
 #include "dom/dom_manager.h"
 #include "dom/dom_node.h"
@@ -26,6 +27,7 @@ class ScreenBuilder {
 
  private:
   std::vector<std::function<void()>> ops_;
+  std::mutex mutex_;
 };
 
 }  // namespace dom
