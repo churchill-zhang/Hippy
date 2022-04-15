@@ -118,7 +118,6 @@ struct InstanceDefine {
   std::vector<PropertyDefine<T>> properties{};
   std::vector<FunctionDefine<T>> functions{};
   unicode_string_view name;
-  // static std::mutex mutex;
   std::unordered_map<void*, std::shared_ptr<T>> holder;
 };
 

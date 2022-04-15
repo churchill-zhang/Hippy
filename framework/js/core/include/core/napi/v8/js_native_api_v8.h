@@ -254,13 +254,13 @@ class V8Ctx : public Ctx {
   template <typename T>
   v8::Local<v8::FunctionTemplate> NewConstructor(const std::shared_ptr<InstanceDefine<T>> instance_define);
 
+  template <typename T>
+  void RegisterJsClass(const std::shared_ptr<InstanceDefine<T>>& instance_define);
+
   virtual void RegisterClasses(std::weak_ptr<Scope> scope) override {
     auto build = hippy::RegisterScreenBuilder(scope);
     RegisterJsClass(build);
   }
-
-  template <typename T>
-  void RegisterJsClass(const std::shared_ptr<InstanceDefine<T>>& instance_define);
 
   unicode_string_view ToStringView(v8::Local<v8::String> str) const;
   unicode_string_view GetMsgDesc(v8::Local<v8::Message> message);
