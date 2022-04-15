@@ -92,7 +92,8 @@ void DomManager::CreateDomNodes(std::vector<std::shared_ptr<DomNode>>&& nodes) {
           [layout_node, parent_layout_node, index]() { parent_layout_node->InsertChild(layout_node, index); });
 
       self->dom_node_registry_.AddNode(node);
-      self->HandleEvent(std::make_shared<DomEvent>(kOnDomCreated, node, nullptr));
+      auto dom_event = std::make_shared<DomEvent>(kOnDomCreated, node, nullptr);
+      self->HandleEvent(dom_event);
     }
 
     if (!nodes.empty()) {
@@ -146,7 +147,8 @@ void DomManager::UpdateDomNodes(std::vector<std::shared_ptr<DomNode>>&& nodes) {
       it->SetDiffStyle(diff_value);
       it->SetDeleteProps(delete_value);
       // node->ParseLayoutStyleInfo();
-      self->HandleEvent(std::make_shared<DomEvent>(kOnDomUpdated, node, nullptr));
+      auto dom_event = std::make_shared<DomEvent>(kOnDomUpdated, node, nullptr);
+      self->HandleEvent(dom_event);
 
       // 延迟更新 layout tree
       int32_t id = hippy::base::checked_numeric_cast<uint32_t, int32_t>(node->GetId());
@@ -186,7 +188,8 @@ void DomManager::DeleteDomNodes(std::vector<std::shared_ptr<DomNode>>&& nodes) {
         parent_node->RemoveChildAt(parent_node->IndexOf(node));
       }
       self->DeleteDomNode(node);
-      self->HandleEvent(std::make_shared<DomEvent>(kOnDomDeleted, node, nullptr));
+      auto dom_event = std::make_shared<DomEvent>(kOnDomDeleted, node, nullptr);
+      self->HandleEvent(dom_event);
 
       // 延迟删除 layout tree
       auto layout_node = node->GetLayoutNode();
@@ -353,7 +356,7 @@ void DomManager::DoNotifyRender() {
   });
 }
 
-void DomManager::HandleEvent(const std::shared_ptr<DomEvent>& event) {
+void DomManager::HandleEvent(std::shared_ptr<DomEvent>& event) {
   // Post 到 Dom taskRunner 避免多线程问题
   PostTask([WEAK_THIS, event]() {
     DEFINE_AND_CHECK_SELF(DomManager)

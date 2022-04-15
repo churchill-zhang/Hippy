@@ -57,12 +57,12 @@ constexpr char kNodePropertyStyle[] = "style";
 //constexpr char kShowEvent[] = "show";
 //constexpr char kDismissEvent[] = "dismiss";
 
-constexpr char kEventListsKey[] = "__events";
-constexpr char kEventNameKey[] = "name";
-constexpr char kEventCBKey[] = "cb";
+//constexpr char kEventListsKey[] = "__events";
+//constexpr char kEventNameKey[] = "name";
+//constexpr char kEventCBKey[] = "cb";
 
 const int32_t kInvalidValue = -1;
-const uint32_t kInvalidListenerId = 0;
+//const uint32_t kInvalidListenerId = 0;
 
 using DomValue = tdf::base::DomValue;
 using DomArgument = hippy::dom::DomArgument;
@@ -229,67 +229,6 @@ GetNodeProps(const std::shared_ptr<Ctx> &context, const std::shared_ptr<CtxValue
   return std::make_tuple(true, "", std::move(style_map), std::move(dom_ext_map));
 }
 
-void HandleEventListeners(const std::shared_ptr<Ctx> &context,
-                          const std::shared_ptr<CtxValue> &node,
-                          const std::shared_ptr<DomNode> &dom_node,
-                          const std::shared_ptr<Scope> &scope) {
-  auto events = context->GetProperty(node, kEventListsKey);
-  if (events && context->IsArray(events)) {
-    auto len = context->GetArrayLength(events);
-    for (uint32_t i = 0; i < len; ++i) {
-      auto event = context->CopyArrayElement(events, i);
-      auto name_prop = context->GetProperty(event, kEventNameKey);
-      auto cb = context->GetProperty(event, kEventCBKey);
-      unicode_string_view name;
-      auto flag = context->GetValueString(name_prop, &name);
-      TDF_BASE_DCHECK(flag) << "get event name failed";
-      TDF_BASE_DCHECK(context->IsFunction(cb)) << "get event cb failed";
-      if (flag) { // 线上有问题的时候可以兼容，debug包会命中上面DCHECK
-        std::string name_str = StringViewUtils::ToU8StdStr(name);
-        std::weak_ptr<Ctx> weak_context = context;
-        std::weak_ptr<JavaScriptTaskRunner> weak_runner = scope->GetTaskRunner();
-        auto dom_id = dom_node->GetId();
-        if (context->IsNullOrUndefined(cb) || context->IsFunction(cb)) {
-          // cb null 代表移除
-          auto listener_id = scope->GetListenerId(dom_id, name_str);
-          if (listener_id != kInvalidListenerId) {
-            // 目前hippy上层还不支持绑定多个回调，有更新时先移除老的监听，再绑定新的
-            TDF_BASE_CHECK(!scope->GetDomManager().expired());
-            scope->GetDomManager().lock()->RemoveEventListener(dom_id, name_str, listener_id);
-          }
-        }
-        if (context->IsFunction(cb)) {
-          std::weak_ptr<Scope> weak_scope = scope;
-          // dom_node 持有 cb
-          dom_node->AddEventListener(
-              name_str, true,
-              [weak_context, cb](const std::shared_ptr<DomEvent> &event) {
-                auto context = weak_context.lock();
-                if (!context) {
-                  return;
-                }
-                auto param = context->CreateCtxValue(event->GetValue());
-                if (param) {
-                  const std::shared_ptr<CtxValue> argus[] = {param};
-                  context->CallFunction(cb, 1, argus);
-                } else {
-                  const std::shared_ptr<CtxValue> argus[] = {};
-                  context->CallFunction(cb, 0, argus);
-                }
-              },
-              [weak_scope, dom_id, name_str](const std::shared_ptr<DomArgument>& arg) {
-                DomValue dom_value;
-                std::shared_ptr<Scope> scope = weak_scope.lock();
-                if (scope && arg->ToObject(dom_value) && dom_value.IsUInt32()) {
-                  scope->AddListener(dom_id, name_str, dom_value.ToUint32Checked());
-                }
-              });
-        }
-      }
-    }
-  }
-}
-
 std::tuple<bool, std::string, std::shared_ptr<DomNode>>
 CreateNode(const std::shared_ptr<Ctx> &context,
            const std::shared_ptr<CtxValue> &node,
@@ -335,7 +274,6 @@ CreateNode(const std::shared_ptr<Ctx> &context,
                                        std::move(std::get<2>(props_tuple)),
                                        std::move(std::get<3>(props_tuple)),
                                        scope->GetDomManager().lock());
-  HandleEventListeners(context, node, dom_node, scope);
   return std::make_tuple(true, "", dom_node);
 }
 
