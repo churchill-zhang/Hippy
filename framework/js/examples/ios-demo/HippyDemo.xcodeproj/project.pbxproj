@@ -141,6 +141,7 @@
 		A1649EDC265BB62700D9D700 /* HippyCollectionViewWaterfallLayout.m in Sources */ = {isa = PBXBuildFile; fileRef = A1649ED6265BB62700D9D700 /* HippyCollectionViewWaterfallLayout.m */; };
 		A1649EDD265BB62700D9D700 /* HippyWaterfallViewManager.mm in Sources */ = {isa = PBXBuildFile; fileRef = A1649ED7265BB62700D9D700 /* HippyWaterfallViewManager.mm */; };
 		AC63515623F92C99007FABA5 /* TTTGB-Medium.otf in Resources */ = {isa = PBXBuildFile; fileRef = AC63515523F92C99007FABA5 /* TTTGB-Medium.otf */; };
+		D46949CE280EE1310061D1E5 /* event_module.cc in Sources */ = {isa = PBXBuildFile; fileRef = D46949CD280EE1310061D1E5 /* event_module.cc */; };
 		D4B09E392750D2C000643CDF /* Flex.cpp in Sources */ = {isa = PBXBuildFile; fileRef = D4B09E362750D21600643CDF /* Flex.cpp */; };
 		D84AB8EC273A5AAD00987D03 /* dom_manager.cc in Sources */ = {isa = PBXBuildFile; fileRef = D84AB8E5273A5AAD00987D03 /* dom_manager.cc */; };
 		D84AB8ED273A5AAD00987D03 /* dom_node.cc in Sources */ = {isa = PBXBuildFile; fileRef = D84AB8E6273A5AAD00987D03 /* dom_node.cc */; };
@@ -519,6 +520,8 @@
 		A1649ED8265BB62700D9D700 /* HippyWaterfallView.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = HippyWaterfallView.h; sourceTree = "<group>"; };
 		AC63515523F92C99007FABA5 /* TTTGB-Medium.otf */ = {isa = PBXFileReference; lastKnownFileType = file; path = "TTTGB-Medium.otf"; sourceTree = "<group>"; };
 		B2C1237A278C0C140081B8AF /* DemoConfigs.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = DemoConfigs.h; sourceTree = "<group>"; };
+		D46949CC280EE0DE0061D1E5 /* event_module.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; path = event_module.h; sourceTree = "<group>"; };
+		D46949CD280EE1310061D1E5 /* event_module.cc */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.cpp.cpp; path = event_module.cc; sourceTree = "<group>"; };
 		D4B09E362750D21600643CDF /* Flex.cpp */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.cpp.cpp; path = Flex.cpp; sourceTree = "<group>"; };
 		D84AB8DA273A5AAD00987D03 /* layout_node.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = layout_node.h; sourceTree = "<group>"; };
 		D84AB8DB273A5AAD00987D03 /* dom_listener.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; path = dom_listener.h; sourceTree = "<group>"; };
@@ -1502,6 +1505,7 @@
 		D84AB92A273A618B00987D03 /* modules */ = {
 			isa = PBXGroup;
 			children = (
+				D46949CC280EE0DE0061D1E5 /* event_module.h */,
 				D8E6FCBD280EA49B0037DDC9 /* scene_bulider.h */,
 				D84AB92B273A618B00987D03 /* module_register.h */,
 				D84AB92C273A618B00987D03 /* console_module.h */,
@@ -1654,6 +1658,7 @@
 		D84AB96F273A618B00987D03 /* modules */ = {
 			isa = PBXGroup;
 			children = (
+				D46949CD280EE1310061D1E5 /* event_module.cc */,
 				D8E6FCBE280EA4E90037DDC9 /* scene_builder.cc */,
 				D84AB970273A618B00987D03 /* module_register.cc */,
 				D84AB971273A618B00987D03 /* ui_manager_module.cc */,
@@ -2070,6 +2075,7 @@
 				F4A8424227D38CF900AEFC88 /* NativeRenderManager.mm in Sources */,
 				064C5A3823AB1A51001E80DD /* HippyModalHostView.mm in Sources */,
 				787C19A22726A1020062EBFF /* HippyInspectorDomain.m in Sources */,
+				D46949CE280EE1310061D1E5 /* event_module.cc in Sources */,
 				064C59FB23AB1A51001E80DD /* HippyEventObserverModule.m in Sources */,
 				787C19A32726A1020062EBFF /* HippyInspector.m in Sources */,
 				064C5A1723AB1A51001E80DD /* HippyTextField.mm in Sources */,
