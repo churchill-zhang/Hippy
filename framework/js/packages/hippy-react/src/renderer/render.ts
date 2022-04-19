@@ -73,28 +73,25 @@ function chunkNodes(batchNodes: BatchChunk[]) {
  */
 function batchUpdate(rootViewId: number): void {
   const chunks = chunkNodes(batchNodes);
-  const screenBuilder = new global.ScreenBuilder(rootViewId);
+  const sceneBuilder = new global.SceneBuilder(rootViewId);
   chunks.forEach((chunk) => {
     switch (chunk.type) {
       case NODE_OPERATION_TYPES.createNode:
         trace(...componentName, 'createNode', chunk.nodes);
-        screenBuilder.Create(chunk.nodes);
-        // UIManagerModule.createNode(rootViewId, chunk.nodes);
+        sceneBuilder.Create(chunk.nodes);
         break;
       case NODE_OPERATION_TYPES.updateNode:
         trace(...componentName, 'updateNode', chunk.nodes);
-        screenBuilder.Update(chunk.nodes);
-        // UIManagerModule.updateNode(rootViewId, chunk.nodes);
+        sceneBuilder.Update(chunk.nodes);
         break;
       case NODE_OPERATION_TYPES.deleteNode:
         trace(...componentName, 'deleteNode', chunk.nodes);
-        screenBuilder.Delete(chunk.nodes);
-        // UIManagerModule.deleteNode(rootViewId, chunk.nodes);
+        sceneBuilder.Delete(chunk.nodes);
         break;
       default:
     }
   });
-  screenBuilder.Build();
+  sceneBuilder.Build();
 }
 
 /**
@@ -112,7 +109,6 @@ function endBatch(isHookUsed = false): void {
   // if commitEffectsHook used, call batchUpdate synchronously
   if (isHookUsed) {
     batchUpdate(rootViewId);
-    // UIManagerModule.endBatch();
     batchNodes = [];
     batchIdle = true;
   } else {
