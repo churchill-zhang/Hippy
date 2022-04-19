@@ -35,7 +35,7 @@
 #include "core/task/worker_task_runner.h"
 #include "dom/dom_manager.h"
 #include "dom/render_manager.h"
-#include "dom/screen_builder.h"
+#include "dom/scene_builder.h"
 
 class JavaScriptTaskRunner;
 class ModuleBase;
@@ -80,7 +80,7 @@ class Scope {
                       const std::shared_ptr<CtxValue>& value);
 
   void SaveFunctionData(std::unique_ptr<FunctionData> data);
-  inline void SaveClassInstance(std::shared_ptr<hippy::napi::InstanceDefine<hippy::ScreenBuilder>> instance) {
+  inline void SaveClassInstance(std::shared_ptr<hippy::napi::InstanceDefine<hippy::SceneBuilder>> instance) {
       instance_holder_ = instance;
   }
 
@@ -155,7 +155,7 @@ class Scope {
       module_class_map_;
   std::unordered_map<uint32_t, std::unordered_map<std::string, uint32_t>> listener_id_map_;
   std::vector<std::unique_ptr<FunctionData>> function_data_;
-  std::shared_ptr<hippy::napi::InstanceDefine<hippy::ScreenBuilder>> instance_holder_;
+  std::shared_ptr<hippy::napi::InstanceDefine<hippy::SceneBuilder>> instance_holder_;
   std::unique_ptr<BindingData> binding_data_;
   std::unique_ptr<ScopeWrapper> wrapper_;
   std::shared_ptr<UriLoader> loader_;

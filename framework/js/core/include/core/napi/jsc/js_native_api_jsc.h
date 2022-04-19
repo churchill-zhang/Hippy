@@ -33,8 +33,8 @@
 #include "core/base/macros.h"
 #include "core/napi/js_native_api_types.h"
 #include "core/scope.h"
-#include "core/modules/screen_bulider.h"
-#include "dom/screen_builder.h"
+#include "core/modules/scene_bulider.h"
+#include "dom/scene_builder.h"
 #include "core/base/string_view_utils.h"
 #include "core/modules/event_module.h"
 #include "dom/dom_event.h"
@@ -279,7 +279,7 @@ class JSCTryCatch : public TryCatch {
 };
 
 inline void JSCCtx::RegisterClasses(std::weak_ptr<Scope> scope) {
-  auto build = hippy::RegisterScreenBuilder(scope);
+  auto build = hippy::RegisterSceneBuilder(scope);
   RegisterJsClass(build);
 }
 

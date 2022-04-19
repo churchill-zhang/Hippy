@@ -6,10 +6,10 @@
 namespace hippy {
 inline namespace dom {
 
-class Screen {
+class Scene {
  public:
-  Screen(std::vector<std::function<void()>>&& ops);
-  ~Screen() = default;
+  Scene(std::vector<std::function<void()>>&& ops);
+  ~Scene() = default;
 
   void Build() const;
 

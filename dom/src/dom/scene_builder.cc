@@ -1,4 +1,4 @@
-#include "dom/screen_builder.h"
+#include "dom/scene_builder.h"
 
 #include "base/logging.h"
 #include "core/base/string_view_utils.h"
@@ -9,8 +9,8 @@ const uint32_t kInvalidListenerId = 0;
 namespace hippy {
 inline namespace dom {
 
-void ScreenBuilder::Create(const std::weak_ptr<DomManager>& dom_manager,
-                           std::vector<std::shared_ptr<DomNode>>&& nodes) {
+void SceneBuilder::Create(const std::weak_ptr<DomManager>& dom_manager,
+                          std::vector<std::shared_ptr<DomNode>>&& nodes) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   ops_.emplace_back([dom_manager, move_nodes = std::move(nodes)]() mutable {
@@ -21,8 +21,8 @@ void ScreenBuilder::Create(const std::weak_ptr<DomManager>& dom_manager,
   });
 }
 
-void ScreenBuilder::Update(const std::weak_ptr<DomManager>& dom_manager,
-                           std::vector<std::shared_ptr<DomNode>>&& nodes) {
+void SceneBuilder::Update(const std::weak_ptr<DomManager>& dom_manager,
+                          std::vector<std::shared_ptr<DomNode>>&& nodes) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   ops_.emplace_back([dom_manager, move_nodes = std::move(nodes)]() mutable {
@@ -33,8 +33,8 @@ void ScreenBuilder::Update(const std::weak_ptr<DomManager>& dom_manager,
   });
 }
 
-void ScreenBuilder::Delete(const std::weak_ptr<DomManager>& dom_manager,
-                           std::vector<std::shared_ptr<DomNode>>&& nodes) {
+void SceneBuilder::Delete(const std::weak_ptr<DomManager>& dom_manager,
+                          std::vector<std::shared_ptr<DomNode>>&& nodes) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   ops_.emplace_back([dom_manager, move_nodes = std::move(nodes)]() mutable {
@@ -45,8 +45,8 @@ void ScreenBuilder::Delete(const std::weak_ptr<DomManager>& dom_manager,
   });
 }
 
-void ScreenBuilder::AddEventListener(std::shared_ptr<Scope>& scope, size_t argument_count,
-                                     const std::shared_ptr<hippy::napi::CtxValue> arguments[]) {
+void SceneBuilder::AddEventListener(std::shared_ptr<Scope>& scope, size_t argument_count,
+                                    const std::shared_ptr<hippy::napi::CtxValue> arguments[]) {
   std::shared_ptr<hippy::napi::Ctx> context = scope->GetContext();
   TDF_BASE_CHECK(argument_count == 3) << "add event invalid parameter size";
 
@@ -108,7 +108,7 @@ void ScreenBuilder::AddEventListener(std::shared_ptr<Scope>& scope, size_t argum
   });
 }
 
-Screen ScreenBuilder::Build(const std::weak_ptr<DomManager>& dom_manager) {
+Scene SceneBuilder::Build(const std::weak_ptr<DomManager>& dom_manager) {
   std::lock_guard<std::mutex> lock(mutex_);
 
   ops_.emplace_back([dom_manager]{
@@ -117,7 +117,7 @@ Screen ScreenBuilder::Build(const std::weak_ptr<DomManager>& dom_manager) {
       manager->EndBatch();
     }
   });
-  return Screen(std::move(ops_));
+  return Scene(std::move(ops_));
 }
 
 }  // namespace dom

@@ -523,7 +523,7 @@ unicode_string_view V8Ctx::GetStackInfo(v8::Local<v8::Message> message) {
   return stack_str;
 }
 
-#include "dom/screen_builder.h"
+#include "dom/scene_builder.h"
 bool V8Ctx::RegisterGlobalInJs() {
   TDF_BASE_DLOG(INFO) << "RegisterGlobalInJs";
   v8::HandleScope handle_scope(isolate_);
