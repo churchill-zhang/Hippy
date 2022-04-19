@@ -45,66 +45,61 @@ void SceneBuilder::Delete(const std::weak_ptr<DomManager>& dom_manager,
   });
 }
 
-void SceneBuilder::AddEventListener(std::shared_ptr<Scope>& scope, size_t argument_count,
-                                    const std::shared_ptr<hippy::napi::CtxValue> arguments[]) {
-  std::shared_ptr<hippy::napi::Ctx> context = scope->GetContext();
-  TDF_BASE_CHECK(argument_count == 3) << "add event invalid parameter size";
+void SceneBuilder::AddEventListener(const std::weak_ptr<Scope>& weak_scope, const EventListenerInfo& event_listener_info) {
+  ops_.emplace_back([weak_scope, event_listener_info]() mutable {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      auto dom_manager = scope->GetDomManager().lock();
+      if (dom_manager) {
+        uint32_t dom_id = event_listener_info.dom_id;
+        std::string event_name = event_listener_info.event_name;
+        auto callback = event_listener_info.callback;
 
-  // get dom node id
-  int32_t dom_id;
-  bool flag = context->GetValueNumber(arguments[0], &dom_id);
-  TDF_BASE_DCHECK(flag) << "get dom id failed";
+        auto listener_id = scope->GetListenerId(dom_id, event_name);
+        if (listener_id != kInvalidListenerId) {
+          // TODO: 目前hippy上层还不支持绑定多个回调，有更新时先移除老的监听，再绑定新的
+          dom_manager->RemoveEventListener(dom_id, event_name, listener_id);
+        }
 
-  // get event name
-  tdf::base::unicode_string_view str_view;
-  flag = context->GetValueString(arguments[1], &str_view);
-  std::string name = hippy::base::StringViewUtils::ToU8StdStr(str_view);
-  TDF_BASE_DCHECK(flag) << "get event name failed";
-
-  // check callback function
-  TDF_BASE_DCHECK(context->IsFunction(arguments[2])) << "get event callback failed";
-  auto callback = arguments[2];
-
-  ops_.emplace_back([scope, dom_id, name, callback]() mutable {
-    std::shared_ptr<hippy::napi::Ctx> context = scope->GetContext();
-    auto weak_dom_manager = scope->GetDomManager();
-    auto manager = weak_dom_manager.lock();
-    if (!manager) {
-      // TODO 异常处理
-      return;
+        dom_manager->AddEventListener(
+            dom_id, event_name, true,
+            [weak_scope, callback](std::shared_ptr<DomEvent>& event) {
+              std::shared_ptr<Scope> scope = weak_scope.lock();
+              if (scope) {
+                auto context = scope->GetContext();
+                if (context) {
+                  context->RegisterDomEvent(scope, callback, event);
+                }
+              }
+            },
+            [weak_scope, dom_id, event_name](const std::shared_ptr<DomArgument>& arg) {
+              tdf::base::DomValue dom_value;
+              std::shared_ptr<Scope> scope = weak_scope.lock();
+              if (scope && arg->ToObject(dom_value) && dom_value.IsUInt32()) {
+                scope->AddListener(static_cast<uint32_t>(dom_id), event_name, dom_value.ToUint32Checked());
+              }
+            });
+      }
     }
+  });
+}
 
-    auto listener_id = scope->GetListenerId(static_cast<uint32_t>(dom_id), name);
-    if (listener_id != kInvalidListenerId) {
-      // TODO: 目前hippy上层还不支持绑定多个回调，有更新时先移除老的监听，再绑定新的
-      manager->RemoveEventListener(static_cast<uint32_t>(dom_id), name, listener_id);
+void SceneBuilder::RemoveEventListener(const std::weak_ptr<Scope>& weak_scope,
+                                       const EventListenerInfo& event_listener_info) {
+  ops_.emplace_back([weak_scope, event_listener_info]() mutable {
+    uint32_t dom_id = event_listener_info.dom_id;
+    std::string event_name = event_listener_info.event_name;
+    auto scope = weak_scope.lock();
+    if (scope) {
+      auto dom_manager = scope->GetDomManager().lock();
+      if (dom_manager) {
+        auto listener_id = scope->GetListenerId(static_cast<uint32_t>(dom_id), event_name);
+        if (listener_id != kInvalidListenerId) {
+          // 目前hippy上层还不支持绑定多个回调，有更新时先移除老的监听，再绑定新的
+          dom_manager->RemoveEventListener(static_cast<uint32_t>(dom_id), event_name, listener_id);
+        }
+      }
     }
-    TDF_BASE_DLOG(INFO) << "UIManagerModule::AddEventListener id = " << dom_id;
-    std::weak_ptr<hippy::napi::Ctx> weak_context = context;
-    std::weak_ptr<Scope> weak_scope = scope;
-    //  auto callback = arguments[2];
-    manager->AddEventListener(
-        static_cast<uint32_t>(dom_id), name, true,
-        [weak_context, weak_scope, callback](std::shared_ptr<DomEvent>& event) {
-          auto context = weak_context.lock();
-          if (!context) {
-            return;  // TODO
-          }
-
-          auto scope = weak_scope.lock();
-          if (!scope) {
-            return;  // TODO
-          }
-          // TODO: 先写在这里，后面调整代码位置
-          context->RegisterDomEvent(scope, callback, event);
-        },
-        [weak_scope, dom_id, name](const std::shared_ptr<DomArgument>& arg) {
-          tdf::base::DomValue dom_value;
-          std::shared_ptr<Scope> scope = weak_scope.lock();
-          if (scope && arg->ToObject(dom_value) && dom_value.IsUInt32()) {
-            scope->AddListener(static_cast<uint32_t>(dom_id), name, dom_value.ToUint32Checked());
-          }
-        });
   });
 }
 

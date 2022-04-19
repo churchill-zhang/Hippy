@@ -22,11 +22,13 @@
 
 #include "core/modules/scene_bulider.h"
 
-#include "core/scope.h"
 #include "base/unicode_string_view.h"
-#include "core/napi/js_native_api_types.h"
+#include "core/base/string_view_utils.h"
+#include "core/modules/scene_bulider.h"
 #include "core/modules/ui_manager_module.h"
-#include "dom/scene_builder.h"
+#include "core/napi/js_native_api_types.h"
+#include "core/scope.h"
+
 
 template <typename T>
 using InstanceDefine = hippy::napi::InstanceDefine<T>;
@@ -39,6 +41,30 @@ using FunctionDefine = hippy::napi::FunctionDefine<T>;
 using CtxValue = hippy::napi::CtxValue;
 
 namespace hippy {
+
+void HandleEventListenerInfo(const std::shared_ptr<hippy::napi::Ctx> &context,
+                             const size_t argument_count,
+                             const std::shared_ptr<CtxValue> arguments[],
+                             hippy::dom::EventListenerInfo& listener_info){
+  TDF_BASE_CHECK(argument_count == 2 || argument_count == 3);
+
+  int32_t dom_id;
+  bool ret = context->GetValueNumber(arguments[0], &dom_id);
+  TDF_BASE_CHECK(ret) << "get dom id failed";
+
+  tdf::base::unicode_string_view str_view;
+  ret = context->GetValueString(arguments[1], &str_view);
+  std::string event_name = hippy::base::StringViewUtils::ToU8StdStr(str_view);
+  TDF_BASE_DCHECK(ret) << "get event name failed";
+
+  listener_info.dom_id = static_cast<uint32_t>(dom_id);
+  listener_info.event_name = event_name;
+  listener_info.callback = nullptr;
+
+  if (argument_count == 3) {
+    listener_info.callback = arguments[2];
+  }
+};
 
 std::shared_ptr<InstanceDefine<SceneBuilder>> RegisterSceneBuilder(const std::weak_ptr<Scope>& weak_scope) {
   using SceneBuilder = hippy::dom::SceneBuilder;
@@ -104,7 +130,9 @@ std::shared_ptr<InstanceDefine<SceneBuilder>> RegisterSceneBuilder(const std::we
       const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
     auto scope = weak_scope.lock();
     if (scope) {
-      builder->AddEventListener(scope, argument_count, arguments);
+      hippy::dom::EventListenerInfo listener_info;
+      HandleEventListenerInfo(scope->GetContext(), argument_count, arguments, listener_info);
+      builder->AddEventListener(scope, listener_info);
     }
     return nullptr;
   };
@@ -117,6 +145,12 @@ std::shared_ptr<InstanceDefine<SceneBuilder>> RegisterSceneBuilder(const std::we
       SceneBuilder* builder,
       size_t argument_count,
       const std::shared_ptr<CtxValue> arguments[]) -> std::shared_ptr<CtxValue> {
+    auto scope = weak_scope.lock();
+    if (scope) {
+      hippy::dom::EventListenerInfo listener_info;
+      HandleEventListenerInfo(scope->GetContext(), argument_count, arguments, listener_info);
+      builder->RemoveEventListener(scope, listener_info);
+    }
     return nullptr;
   };
   def.functions.emplace_back(std::move(remove_event_listener_def));
