@@ -1888,7 +1888,7 @@ unicode_string_view V8Ctx::CopyFunctionName(
 }
 
 // TODO 暂时这么写
-void V8Ctx::RegisterEvent(std::weak_ptr<Scope> scope, const std::shared_ptr<CtxValue> callback, std::shared_ptr<DomEvent>& dom_event) {
+void V8Ctx::RegisterDomEvent(std::weak_ptr<Scope> scope, const std::shared_ptr<CtxValue> callback, std::shared_ptr<DomEvent>& dom_event) {
   auto instance_define = hippy::MakeEventInstanceDefine(scope, dom_event);
   v8::HandleScope handle_scope(isolate_);
   v8::Local<v8::Context> context = context_persistent_.Get(isolate_);

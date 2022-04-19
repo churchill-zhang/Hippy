@@ -7,4 +7,4 @@ namespace hippy {
 std::shared_ptr<hippy::napi::InstanceDefine<DomEvent>> MakeEventInstanceDefine(
     const std::weak_ptr<Scope>& weak_scope, std::shared_ptr<DomEvent>& dom_event);
 
-}
+} // namespace hippy

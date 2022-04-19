@@ -1096,9 +1096,10 @@ dispatch_queue_t HippyGetUIManagerQueue(void) {
         [view addViewEvent:HippyViewEventTypeClick eventListener:^(CGPoint) {
             [self domNodeForHippyTag:hippyTag resultNode:^(std::shared_ptr<DomNode> node) {
                 if (node) {
-                    node->HandleEvent(std::make_shared<hippy::DomEvent>(hippy::kClickEvent, node,
-                                                                        canBePreventedInCapturing, canBePreventedInBubbling,
-                                                                        static_cast<std::shared_ptr<DomValue>>(nullptr)));
+                    auto event = std::make_shared<hippy::DomEvent>(hippy::kClickEvent, node,
+                                                                   canBePreventedInCapturing, canBePreventedInBubbling,
+                                                                   static_cast<std::shared_ptr<DomValue>>(nullptr));
+                    node->HandleEvent(event);
                 }
             }];
         }];
@@ -1118,9 +1119,10 @@ dispatch_queue_t HippyGetUIManagerQueue(void) {
         [view addViewEvent:HippyViewEventTypeLongClick eventListener:^(CGPoint) {
             [self domNodeForHippyTag:hippyTag resultNode:^(std::shared_ptr<DomNode> node) {
                 if (node) {
-                    node->HandleEvent(std::make_shared<hippy::DomEvent>(hippy::kLongClickEvent, node,
-                                                                        canBePreventedInCapturing, canBePreventedInBubbling,
-                                                                        static_cast<std::shared_ptr<DomValue>>(nullptr)));
+                    auto event = std::make_shared<hippy::DomEvent>(hippy::kLongClickEvent, node,
+                                                                   canBePreventedInCapturing, canBePreventedInBubbling,
+                                                                   static_cast<std::shared_ptr<DomValue>>(nullptr));
+                    node->HandleEvent(event);
                 }
             }];
         }];
@@ -1142,9 +1144,10 @@ dispatch_queue_t HippyGetUIManagerQueue(void) {
         [view addViewEvent:eventType eventListener:^(CGPoint) {
             [self domNodeForHippyTag:hippyTag resultNode:^(std::shared_ptr<DomNode> node) {
                 if (node) {
-                    node->HandleEvent(std::make_shared<hippy::DomEvent>(block_type, node,
-                                                                        canBePreventedInCapturing, canBePreventedInBubbling,
-                                                                        static_cast<std::shared_ptr<DomValue>>(nullptr)));
+                    auto event = std::make_shared<hippy::DomEvent>(block_type, node,
+                                                                   canBePreventedInCapturing, canBePreventedInBubbling,
+                                                                   static_cast<std::shared_ptr<DomValue>>(nullptr));
+                    node->HandleEvent(event);
                 }
             }];
         }];
@@ -1182,8 +1185,9 @@ dispatch_queue_t HippyGetUIManagerQueue(void) {
                     domValue["page_y"] = tdf::base::DomValue(point.y);
                     std::shared_ptr<tdf::base::DomValue> value = std::make_shared<tdf::base::DomValue>(domValue);
                     if (node) {
-                       node->HandleEvent(std::make_shared<DomEvent>(type_, node, canBePreventedInCapturing,
-                                                                    canBePreventedInBubbling,value));
+                        auto event = std::make_shared<DomEvent>(type_, node, canBePreventedInCapturing,
+                                                                canBePreventedInBubbling,value);
+                       node->HandleEvent(event);
                     }
                 }
             }];
@@ -1206,8 +1210,9 @@ dispatch_queue_t HippyGetUIManagerQueue(void) {
             [self domNodeForHippyTag:hippyTag resultNode:^(std::shared_ptr<DomNode> node) {
                 if (node) {
                     std::shared_ptr<DomValue> domValue = std::make_shared<DomValue>(true);
-                    node->HandleEvent(std::make_shared<DomEvent>(type, node, canBePreventedInCapturing,
-                                                                 canBePreventedInBubbling, domValue));
+                    auto event = std::make_shared<DomEvent>(type, node, canBePreventedInCapturing,
+                                                            canBePreventedInBubbling, domValue);
+                    node->HandleEvent(event);
                 }
             }];
         }];
@@ -1261,8 +1266,9 @@ dispatch_queue_t HippyGetUIManagerQueue(void) {
                     if (domNode) {
                         DomValue value = [body toDomValue];
                         std::shared_ptr<DomValue> domValue = std::make_shared<DomValue>(std::move(value));
-                        domNode->HandleEvent(std::make_shared<DomEvent>(name_, domNode, canBePreventedInCapturing,
-                                                                     canBePreventedInBubbling, domValue));
+                        auto event = std::make_shared<DomEvent>(name_, domNode, canBePreventedInCapturing,
+                                                                canBePreventedInBubbling, domValue);
+                        domNode->HandleEvent(event);
                     }
                 }];
             }];

@@ -96,7 +96,7 @@ void ScreenBuilder::AddEventListener(std::shared_ptr<Scope>& scope, size_t argum
             return;  // TODO
           }
           // TODO: 先写在这里，后面调整代码位置
-          context->RegisterEvent(scope, callback, event);
+          context->RegisterDomEvent(scope, callback, event);
         },
         [weak_scope, dom_id, name](const std::shared_ptr<DomArgument>& arg) {
           tdf::base::DomValue dom_value;

@@ -264,7 +264,7 @@ class V8Ctx : public Ctx {
     RegisterJsClass(build);
   }
 
-  virtual void RegisterEvent(std::weak_ptr<Scope> scope, const std::shared_ptr<CtxValue> callback, std::shared_ptr<DomEvent>& dom_event) override;
+  virtual void RegisterDomEvent(std::weak_ptr<Scope> scope, const std::shared_ptr<CtxValue> callback, std::shared_ptr<DomEvent>& dom_event) override;
   unicode_string_view ToStringView(v8::Local<v8::String> str) const;
   unicode_string_view GetMsgDesc(v8::Local<v8::Message> message);
   unicode_string_view GetStackInfo(v8::Local<v8::Message> message);
