@@ -64,7 +64,7 @@ void HandleEventListenerInfo(const std::shared_ptr<hippy::napi::Ctx> &context,
   if (argument_count == 3) {
     listener_info.callback = arguments[2];
   }
-};
+}
 
 std::shared_ptr<InstanceDefine<SceneBuilder>> RegisterSceneBuilder(const std::weak_ptr<Scope>& weak_scope) {
   using SceneBuilder = hippy::dom::SceneBuilder;
