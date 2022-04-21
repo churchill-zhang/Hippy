@@ -32,6 +32,7 @@ import {
   nativeEventMap,
 } from '../utils/node';
 import { trace, warn } from '../utils';
+import { EventDispatcher } from '../event';
 
 const componentName = ['%c[native]%c', 'color: red', 'color: auto'];
 
@@ -101,11 +102,21 @@ function handleEventListeners(eventNodes: HippyTypes.EventNode[] = [], sceneBuil
         }
         if (type === eventHandlerType.ADD && !hasBound) {
           const callback = (event) => {
+            const { id,  currentId, params } = event;
             console.log('callback event', event);
+            if (isNativeGesture(name)) {
+              const dispatcherEvent = {
+                id, name, currentId,
+              };
+              Object.assign(dispatcherEvent, params);
+              EventDispatcher.receiveNativeGesture(dispatcherEvent);
+            } else {
+              const dispatcherEvent = [id, name, params];
+              EventDispatcher.receiveUIComponentEvent(dispatcherEvent);
+            }
           };
           eventAttribute.hasBound = true;
           eventAttribute.listener = listener;
-          console.log('AddEventListener', id, nativeEventName, callback);
           sceneBuilder.AddEventListener(id, nativeEventName, callback);
         }
       });
