@@ -60,7 +60,7 @@ class V8BridgeUtils {
                               std::shared_ptr<Bridge> bridge,
                               const RegisterFunction& scope_cb,
                               const RegisterFunction& call_native_cb);
-  static bool DestroyInstance(int64_t runtime_id,  const std::function<void()>& callback);
+  static bool DestroyInstance(int64_t runtime_id, const std::function<void()>& callback);
   static bool RunScript(const std::shared_ptr<Runtime>& runtime,
                         const unicode_string_view& file_name,
                         bool is_use_code_cache,
@@ -87,11 +87,12 @@ class V8BridgeUtils {
                      std::function<void()> on_js_runner);
   static void CallNative(hippy::napi::CBDataTuple* data,
                          const std::function<void(std::shared_ptr<Runtime>,
-                                            unicode_string_view,
-                                            unicode_string_view,
-                                            unicode_string_view,
-                                            bool,
-                                            bytes)>& cb);
+                                                  unicode_string_view,
+                                                  unicode_string_view,
+                                                  unicode_string_view,
+                                                  bool,
+                                                  bytes)>& cb);
+  static void LoadInstance(int32_t runtime_id, bytes&& buffer_data);
  private:
   static std::function<void(std::shared_ptr<Runtime>,
                             unicode_string_view,

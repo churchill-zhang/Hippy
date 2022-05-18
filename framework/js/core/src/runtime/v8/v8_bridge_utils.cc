@@ -10,6 +10,8 @@
 #include "core/base/string_view_utils.h"
 #include "core/napi/v8/js_native_api_v8.h"
 #include "core/napi/v8/serializer.h"
+#include "dom/deserializer.h"
+#include "dom/dom_value.h"
 
 namespace hippy::runtime {
 
@@ -18,6 +20,8 @@ using unicode_string_view = tdf::base::unicode_string_view;
 using u8string = unicode_string_view::u8string;
 using Ctx = hippy::napi::Ctx;
 using CtxValue = hippy::napi::CtxValue;
+using Deserializer = tdf::base::Deserializer;
+using DomValue = tdf::base::DomValue;
 using HippyFile = hippy::base::HippyFile;
 using StringViewUtils = hippy::base::StringViewUtils;
 using RegisterMap = hippy::base::RegisterMap;
@@ -44,9 +48,9 @@ static std::mutex engine_mutex;
 std::function<void(std::shared_ptr<Runtime>,
                    unicode_string_view,
                    unicode_string_view)> V8BridgeUtils::on_throw_exception_to_js_ = [](
-                       const std::shared_ptr<Runtime>&,
-                       const unicode_string_view&,
-                       const unicode_string_view&) {};
+    const std::shared_ptr<Runtime>&,
+    const unicode_string_view&,
+    const unicode_string_view&) {};
 
 int64_t V8BridgeUtils::InitInstance(bool enable_v8_serialization,
                                     bool is_dev_module,
@@ -106,7 +110,9 @@ int64_t V8BridgeUtils::InitInstance(bool enable_v8_serialization,
     bool ret = ctx->SetGlobalJsonVar(kHippyNativeGlobalKey, global_config);
     if (!ret) {
       TDF_BASE_DLOG(ERROR) << "register HippyNativeGlobal failed";
-      V8BridgeUtils::on_throw_exception_to_js_(runtime, u"global_config parse error", global_config);
+      V8BridgeUtils::on_throw_exception_to_js_(runtime,
+                                               u"global_config parse error",
+                                               global_config);
     }
   };
   std::unique_ptr<RegisterMap> scope_cb_map = std::make_unique<RegisterMap>();
@@ -189,12 +195,12 @@ bool V8BridgeUtils::RunScript(const std::shared_ptr<Runtime>& runtime,
 }
 
 bool V8BridgeUtils::RunScriptWithoutLoader(const std::shared_ptr<Runtime>& runtime,
-                                   const unicode_string_view& file_name,
-                                   bool is_use_code_cache,
-                                   const unicode_string_view& code_cache_dir,
-                                   const unicode_string_view& uri,
-                                   bool is_local_file,
-                                   std::function<unicode_string_view()> content_cb) {
+                                           const unicode_string_view& file_name,
+                                           bool is_use_code_cache,
+                                           const unicode_string_view& code_cache_dir,
+                                           const unicode_string_view& uri,
+                                           bool is_local_file,
+                                           std::function<unicode_string_view()> content_cb) {
   TDF_BASE_LOG(INFO) << "RunScript begin, file_name = " << file_name
                      << ", is_use_code_cache = " << is_use_code_cache
                      << ", code_cache_dir = " << code_cache_dir
@@ -213,14 +219,14 @@ bool V8BridgeUtils::RunScriptWithoutLoader(const std::shared_ptr<Runtime>& runti
     }
 
     code_cache_path = code_cache_dir + file_name + unicode_string_view("_") +
-                      unicode_string_view(std::to_string(modify_time));
+        unicode_string_view(std::to_string(modify_time));
 
     std::promise<u8string> read_file_promise;
     std::future<u8string> read_file_future = read_file_promise.get_future();
     std::unique_ptr<CommonTask> task = std::make_unique<CommonTask>();
     task->func_ =
         hippy::base::MakeCopyable([p = std::move(read_file_promise),
-                                   code_cache_path, code_cache_dir]() mutable {
+                                      code_cache_path, code_cache_dir]() mutable {
           u8string content;
           HippyFile::ReadFile(code_cache_path, content, true);
           if (content.empty()) {
@@ -260,9 +266,8 @@ bool V8BridgeUtils::RunScriptWithoutLoader(const std::shared_ptr<Runtime>& runti
   }
 
   auto ret = std::static_pointer_cast<hippy::napi::V8Ctx>(
-                 runtime->GetScope()->GetContext())
-                 ->RunScript(script_content, file_name, is_use_code_cache,
-                             &code_cache_content, true);
+      runtime->GetScope()->GetContext())->RunScript(script_content, file_name, is_use_code_cache,
+                                                    &code_cache_content, true);
   if (is_use_code_cache) {
     if (!StringViewUtils::IsEmpty(code_cache_content)) {
       std::unique_ptr<CommonTask> task = std::make_unique<CommonTask>();
@@ -279,8 +284,7 @@ bool V8BridgeUtils::RunScriptWithoutLoader(const std::shared_ptr<Runtime>& runti
             StringViewUtils::SubStr(code_cache_path, 0, pos);
         int check_parent_dir_ret =
             HippyFile::CheckDir(code_cache_parent_dir, F_OK);
-        TDF_BASE_DLOG(INFO)
-            << "check_parent_dir_ret = " << check_parent_dir_ret;
+        TDF_BASE_DLOG(INFO) << "check_parent_dir_ret = " << check_parent_dir_ret;
         if (check_parent_dir_ret) {
           HippyFile::CreateDir(code_cache_parent_dir, S_IRWXU);
         }
@@ -329,7 +333,7 @@ void V8BridgeUtils::HandleUncaughtJsError(v8::Local<v8::Message> message,
   TDF_BASE_DLOG(INFO) << "HandleUncaughtJsError end";
 }
 
-bool V8BridgeUtils::DestroyInstance(int64_t runtime_id,  const std::function<void()>& callback) {
+bool V8BridgeUtils::DestroyInstance(int64_t runtime_id, const std::function<void()>& callback) {
   TDF_BASE_DLOG(INFO) << "DestroyInstance begin, runtime_id = " << runtime_id;
   std::shared_ptr<Runtime> runtime = Runtime::Find(
       hippy::base::checked_numeric_cast<int64_t, int32_t>(runtime_id));
@@ -448,12 +452,10 @@ void V8BridgeUtils::CallJs(const unicode_string_view& action,
     std::shared_ptr<CtxValue> params;
     if (runtime->IsEnableV8Serialization()) {
       v8::Isolate* isolate = std::static_pointer_cast<hippy::napi::V8VM>(
-          runtime->GetEngine()->GetVM())
-          ->isolate_;
+          runtime->GetEngine()->GetVM())->isolate_;
       v8::HandleScope handle_scope(isolate);
       v8::Local<v8::Context> ctx = std::static_pointer_cast<hippy::napi::V8Ctx>(
-          runtime->GetScope()->GetContext())
-          ->context_persistent_.Get(isolate);
+          runtime->GetScope()->GetContext())->context_persistent_.Get(isolate);
       hippy::napi::V8TryCatch try_catch(true, context);
       v8::ValueDeserializer deserializer(
           isolate, reinterpret_cast<const uint8_t*>(buffer_data_.c_str()),
@@ -601,6 +603,36 @@ void V8BridgeUtils::CallNative(hippy::napi::CBDataTuple* data, const std::functi
   }
   TDF_BASE_DLOG(INFO) << "CallNative is_heap_buffer = " << is_heap_buffer;
   cb(runtime, module, func, cb_id, is_heap_buffer, buffer);
+}
+
+void V8BridgeUtils::LoadInstance(int32_t runtime_id, bytes&& buffer_data) {
+  TDF_BASE_DLOG(INFO) << "LoadInstance runtime_id = " << runtime_id;
+  std::shared_ptr<Runtime> runtime = Runtime::Find(runtime_id);
+  if (!runtime) {
+    return;
+  }
+
+  auto runner = runtime->GetEngine()->GetJSRunner();
+  std::shared_ptr<JavaScriptTask> task = std::make_shared<JavaScriptTask>();
+  std::weak_ptr<Scope> weak_scope = runtime->GetScope();
+  task->callback = [weak_scope, buffer_data_ = std::move(buffer_data)] {
+    std::shared_ptr<Scope> scope = weak_scope.lock();
+    if (!scope) {
+      return;
+    }
+    Deserializer deserializer(
+        reinterpret_cast<const uint8_t*>(buffer_data_.c_str()),
+        buffer_data_.length());
+    DomValue value;
+    deserializer.ReadHeader();
+    auto ret = deserializer.ReadValue(value);
+    if (!ret) {
+      scope->LoadInstance(std::make_shared<DomValue>(std::move(value)));
+    } else {
+      scope->GetContext()->ThrowException("LoadInstance param error");
+    }
+  };
+  runner->PostTask(task);
 }
 
 }
